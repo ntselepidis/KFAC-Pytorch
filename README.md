@@ -1,6 +1,6 @@
 # K-FAC_pytorch
-Pytorch implementation of [K-FAC](https://arxiv.org/abs/1503.05671) and [E-KFAC](https://arxiv.org/abs/1806.03884). (Only support single-GPU training, need modifications for multi-GPU.)
-## Requiresments
+Pytorch implementation of [K-FAC](https://arxiv.org/abs/1503.05671) and [E-KFAC](https://arxiv.org/abs/1806.03884). (Only supports single-GPU training, needs modifications for multi-GPU.)
+## Requirements
 ```
 pytorch 0.4.0
 torchvision
@@ -51,7 +51,7 @@ For SGD: <br>
 | SGD    | [ResNet110](https://arxiv.org/abs/1512.03385)| 72.60% | 0.1 | 0.0003 | - |
 
 ## Others
-Please consider cite the following papers for K-FAC:
+Please consider citing the following papers for K-FAC:
 ```
 @inproceedings{martens2015optimizing,
   title={Optimizing neural networks with kronecker-factored approximate curvature},
@@ -81,4 +81,4 @@ and for E-KFAC:
 }
 ```
 
-If you have any questions or suggestions, please feel free to contact me via alecwangcq at gmail , com!
+If you have any questions or suggestions, please feel free to contact me via alecwangcq at gmail . com!
