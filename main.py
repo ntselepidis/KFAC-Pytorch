@@ -85,7 +85,7 @@ if optim_name == 'sgd':
 elif optim_name == 'adam':
     optimizer = optim.Adam(net.parameters(),
                            lr=args.learning_rate,
-                           betas=(0.9, 0.999), # Try (0.0, 0.999)
+                           betas=(args.momentum, 0.999),
                            eps=1e-8,
                            weight_decay=args.weight_decay,
                            amsgrad=False)
