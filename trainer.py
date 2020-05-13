@@ -3,76 +3,95 @@ import os
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--network', type=str, default='vgg16_bn')
 parser.add_argument('--dataset', type=str, default='cifar10')
+parser.add_argument('--network', type=str, default='vgg16_bn')
 parser.add_argument('--optimizer', type=str, default='kfac')
-parser.add_argument('--machine', type=int, default=10)
 
 args = parser.parse_args()
 
+# Flags
+simple_cnn = ''
+vgg11 = ''
+vgg13 = ''
+vgg16 = ''
+vgg19 = ''
+vgg11_bn = ''
+vgg13_bn = ''
 vgg16_bn = ''
 vgg19_bn = ''
-resnet = '--depth 110'
+resnet8 = '--depth 8'
+resnet110 = '--depth 110'
 wrn = '--depth 28 --widen_factor 10 --dropRate 0.3'
 densenet = '--depth 100 --growthRate 12'
 
-apps = {
+flag_dict = {
+    'simple_cnn': simple_cnn,
+    'vgg11': vgg11,
+    'vgg13': vgg13,
+    'vgg16': vgg16,
+    'vgg19': vgg19,
+    'vgg11_bn': vgg11_bn,
+    'vgg13_bn': vgg13_bn,
     'vgg16_bn': vgg16_bn,
     'vgg19_bn': vgg19_bn,
-    'resnet': resnet,
+    'resnet8': resnet8,
+    'resnet110': resnet110,
     'wrn': wrn,
     'densenet': densenet
 }
 
-
 def grid_search(args):
-    scripts = []
+    runs = []
+    # Parameters
+    batch_sizes = [64, 128, 256]
+    momentums = [0.0, 0.9]
+    learning_rates = [1e-1, 1e-2, 1e-3]
+    wd = 1e-4
+    flags = flag_dict[args.network]
+
     if args.optimizer in ['kfac', 'ekfac']:
         template = 'python main.py ' \
                    '--dataset %s ' \
-                   '--optimizer %s ' \
                    '--network %s ' \
-                   ' --epoch 100 ' \
+                   '--optimizer %s ' \
+                   '--batch_size %d ' \
+                   '--epoch 100 ' \
                    '--milestone 40,80 ' \
                    '--learning_rate %f ' \
-                   '--damping %f ' \
+                   '--momentum %f ' \
                    '--weight_decay %f %s'
 
-        lrs = [3e-2, 1e-2, 3e-3]
-        dampings = [3e-2, 1e-3, 3e-3]
-        wds = [1e-2, 3e-3, 1e-3, 3e-4, 1e-4]
-        app = apps[args.network]
-        for lr in lrs:
-            for dmp in dampings:
-                for wd in wds:
-                    scripts.append(template % (args.dataset, args.optimizer, args.network, lr, dmp, wd, app))
-    elif args.optimizer == 'sgd':
+        for bs in batch_sizes:
+            for mom in momentums:
+                for lr in learning_rates:
+                    runs.append(template % (args.dataset, args.network, args.optimizer, bs, lr, mom, wd, flags))
+
+    elif args.optimizer in ['sgd', 'adam']:
         template = 'python main.py ' \
                    '--dataset %s ' \
-                   '--optimizer %s ' \
                    '--network %s ' \
-                   ' --epoch 200 ' \
+                   '--optimizer %s ' \
+                   '--batch_size %d ' \
+                   '--epoch 200 ' \
                    '--milestone 60,120,180 ' \
                    '--learning_rate %f ' \
+                   '--momentum %f ' \
                    '--weight_decay %f %s'
-        app = apps[args.network]
-        lrs = [3e-1, 1e-1, 3e-2]
-        wds = [1e-2, 3e-3, 1e-3, 3e-4, 1e-4]
 
-        for lr in lrs:
-            for wd in wds:
-                scripts.append(template % (args.dataset, args.optimizer, args.network, lr, wd, app))
+        for bs in batch_sizes:
+            for mom in momentums:
+                for lr in learning_rates:
+                    runs.append(template % (args.dataset, args.network, args.optimizer, bs, lr, mom, wd, flags))
 
-    return scripts
+    return runs
 
 
-def gen_script(scripts, machine, args):
-    with open('run_%s_%s_%s.sh' % (args.dataset, args.optimizer, args.network), 'w') as f:
-        for s in scripts:
-            f.write('srun --gres=gpu:1 -c 6 -w guppy%d --mem=16G -p gpu \"%s\" &\n' % (machine, s))
+def gen_script(args, runs):
+    with open('submit_%s_%s_%s.sh' % (args.dataset, args.network, args.optimizer), 'w') as f:
+        for r in runs:
+            f.write('bsub -W 08:00 -n 1 -M 16GB -R "rusage[mem=8192,ngpus_excl_p=1]" %s\n' % r)
 
 
 if __name__ == '__main__':
-    scripts = grid_search(args)
-    gen_script(scripts, args.machine, args)
+    gen_script(args, grid_search(args))
 
