@@ -1,5 +1,6 @@
 import argparse
 import os
+import time
 
 
 parser = argparse.ArgumentParser()
@@ -88,8 +89,9 @@ def grid_search(args):
 
 def gen_script(args, runs):
     with open('submit_%s_%s_%s.sh' % (args.dataset, args.network, args.optimizer), 'w') as f:
-        for r in runs:
-            f.write('bsub -W 08:00 -n 1 -M 16GB -R "rusage[mem=8192,ngpus_excl_p=1]" %s\n' % r)
+        for cnt, run in enumerate(runs):
+            f.write('bsub -W 08:00 -n 1 -M 16GB -R "rusage[mem=8192,ngpus_excl_p=1]" -oo $SCRATCH/KFAC_jobs/%s_%s_%s_%d.txt %s\n'
+                    % (args.dataset, args.network, args.optimizer, int(time.time()+cnt), run))
 
 
 if __name__ == '__main__':
