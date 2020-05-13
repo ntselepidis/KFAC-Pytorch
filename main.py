@@ -136,8 +136,8 @@ if args.resume:
 # init summary writter
 
 log_dir = os.path.join(args.log_dir, args.dataset, args.network, args.optimizer,
-                       'lr%.3f_wd%.4f_damping%.4f' %
-                       (args.learning_rate, args.weight_decay, args.damping))
+                       'bs%d_lr%.4f_mom%.4f_wd%.4f_dmp%.4f' %
+                       (args.batch_size, args.learning_rate, args.momentum, args.weight_decay, args.damping))
 if not os.path.isdir(log_dir):
     os.makedirs(log_dir)
 writer = SummaryWriter(log_dir)
