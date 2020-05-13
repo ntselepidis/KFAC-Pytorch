@@ -90,7 +90,7 @@ def grid_search(args):
 def gen_script(args, runs):
     with open('submit_%s_%s_%s.sh' % (args.dataset, args.network, args.optimizer), 'w') as f:
         for cnt, run in enumerate(runs):
-            f.write('bsub -W 08:00 -n 1 -M 16GB -R "rusage[mem=8192,ngpus_excl_p=1]" -oo $SCRATCH/KFAC_jobs/%s_%s_%s_%d.txt %s\n'
+            f.write('bsub -W 08:00 -n 2 -M 16GB -R "rusage[mem=8192,ngpus_excl_p=1]" -oo $SCRATCH/KFAC_jobs/%s_%s_%s_%d.txt %s\n'
                     % (args.dataset, args.network, args.optimizer, int(time.time()+cnt), run))
 
 
