@@ -18,7 +18,7 @@ parser = argparse.ArgumentParser()
 
 
 parser.add_argument('--network', default='vgg16_bn', type=str)
-parser.add_argument('--depth', default=19, type=int)
+parser.add_argument('--depth', default=0, type=int)
 parser.add_argument('--dataset', default='cifar10', type=str)
 
 # densenet
@@ -134,8 +134,12 @@ if args.resume:
     print('==> Loaded checkpoint at epoch: %d, acc: %.2f%%' % (start_epoch, best_acc))
 
 # init summary writter
+if args.depth == 0:
+    args_depth = ""
+else:
+    args_depth = str(args.depth)
 
-log_dir = os.path.join(args.log_dir, args.dataset, args.network, args.optimizer,
+log_dir = os.path.join(args.log_dir, args.dataset, args.network + args_depth, args.optimizer,
                        'bs%d_lr%.4f_mom%.4f_wd%.4f_dmp%.4f' %
                        (args.batch_size, args.learning_rate, args.momentum, args.weight_decay, args.damping))
 if not os.path.isdir(log_dir):

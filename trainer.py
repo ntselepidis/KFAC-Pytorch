@@ -50,6 +50,11 @@ def grid_search(args):
     wd = 1e-4
     flags = flag_dict[args.network]
 
+    # Temporary hack
+    args_network = args.network
+    if 'resnet' in args_network:
+        args_network = 'resnet'
+
     if args.optimizer in ['kfac', 'ekfac']:
         template = 'python main.py ' \
                    '--dataset %s ' \
@@ -65,7 +70,7 @@ def grid_search(args):
         for bs in batch_sizes:
             for mom in momentums:
                 for lr in learning_rates:
-                    runs.append(template % (args.dataset, args.network, args.optimizer, bs, lr, mom, wd, flags))
+                    runs.append(template % (args.dataset, args_network, args.optimizer, bs, lr, mom, wd, flags))
 
     elif args.optimizer in ['sgd', 'adam']:
         template = 'python main.py ' \
@@ -82,7 +87,7 @@ def grid_search(args):
         for bs in batch_sizes:
             for mom in momentums:
                 for lr in learning_rates:
-                    runs.append(template % (args.dataset, args.network, args.optimizer, bs, lr, mom, wd, flags))
+                    runs.append(template % (args.dataset, args_network, args.optimizer, bs, lr, mom, wd, flags))
 
     return runs
 
