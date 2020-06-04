@@ -150,11 +150,10 @@ def train(epoch):
     correct = 0
     total = 0
 
-    lr_scheduler.step()
     desc = ('[%s][LR=%s] Loss: %.3f | Acc: %.3f%% (%d/%d)' %
-            (tag, lr_scheduler.get_lr()[0], 0, 0, correct, total))
+            (tag, lr_scheduler.get_last_lr(), 0, 0, correct, total))
 
-    writer.add_scalar('train/lr', lr_scheduler.get_lr()[0], epoch)
+    writer.add_scalar('train/lr', lr_scheduler.get_last_lr(), epoch)
 
     prog_bar = tqdm(enumerate(trainloader), total=len(trainloader), desc=desc, leave=True)
     for batch_idx, (inputs, targets) in prog_bar:
@@ -181,7 +180,7 @@ def train(epoch):
         correct += predicted.eq(targets).sum().item()
 
         desc = ('[%s][LR=%s] Loss: %.3f | Acc: %.3f%% (%d/%d)' %
-                (tag, lr_scheduler.get_lr()[0], train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
+                (tag, lr_scheduler.get_last_lr(), train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
         prog_bar.set_description(desc, refresh=True)
 
     writer.add_scalar('train/loss', train_loss/(batch_idx + 1), epoch)
@@ -195,7 +194,7 @@ def test(epoch):
     correct = 0
     total = 0
     desc = ('[%s][LR=%s] Loss: %.3f | Acc: %.3f%% (%d/%d)'
-            % (tag,lr_scheduler.get_lr()[0], test_loss/(0+1), 0, correct, total))
+            % (tag,lr_scheduler.get_last_lr(), test_loss/(0+1), 0, correct, total))
 
     prog_bar = tqdm(enumerate(testloader), total=len(testloader), desc=desc, leave=True)
     with torch.no_grad():
@@ -210,7 +209,7 @@ def test(epoch):
             correct += predicted.eq(targets).sum().item()
 
             desc = ('[%s][LR=%s] Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                    % (tag, lr_scheduler.get_lr()[0], test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
+                    % (tag, lr_scheduler.get_last_lr(), test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
             prog_bar.set_description(desc, refresh=True)
 
     # Save checkpoint.
@@ -241,6 +240,7 @@ def main():
     for epoch in range(start_epoch, args.epoch):
         train(epoch)
         test(epoch)
+        lr_scheduler.step()
     return best_acc
 
 
