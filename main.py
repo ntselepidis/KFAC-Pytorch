@@ -169,8 +169,7 @@ def train(epoch):
             # compute true fisher
             optimizer.acc_stats = True
             with torch.no_grad():
-                sampled_y = torch.multinomial(torch.nn.functional.softmax(outputs.cpu().data, dim=1),
-                                              1).squeeze().to(args.device) #.cuda()
+                sampled_y = torch.multinomial(torch.nn.functional.softmax(outputs, dim=1), 1).squeeze()
             loss_sample = criterion(outputs, sampled_y)
             loss_sample.backward(retain_graph=True)
             optimizer.acc_stats = False
