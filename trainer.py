@@ -7,6 +7,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', type=str, default='cifar10')
 parser.add_argument('--network', type=str, default='vgg16_bn')
 parser.add_argument('--optimizer', type=str, default='kfac')
+parser.add_argument('--machine', type=str, default='dalabgpu')
 
 args = parser.parse_args()
 
@@ -44,9 +45,9 @@ flag_dict = {
 def grid_search(args):
     runs = []
     # Parameters
-    batch_sizes = [64, 128, 256]
+    batch_sizes = [1000]
     momentums = [0.0, 0.9]
-    learning_rates = [1e-1, 1e-2, 1e-3]
+    learning_rates = [1]
     wd = 1e-4
     flags = flag_dict[args.network]
 
@@ -62,10 +63,10 @@ def grid_search(args):
                    '--optimizer %s ' \
                    '--batch_size %d ' \
                    '--epoch 100 ' \
-                   '--milestone 40,80 ' \
                    '--learning_rate %f ' \
                    '--momentum %f ' \
                    '--weight_decay %f %s'
+#                   '--milestone 40,80 '
 
         for bs in batch_sizes:
             for mom in momentums:
@@ -79,10 +80,10 @@ def grid_search(args):
                    '--optimizer %s ' \
                    '--batch_size %d ' \
                    '--epoch 200 ' \
-                   '--milestone 60,120,180 ' \
                    '--learning_rate %f ' \
                    '--momentum %f ' \
                    '--weight_decay %f %s'
+#                   '--milestone 60,120,180 '
 
         for bs in batch_sizes:
             for mom in momentums:
@@ -94,9 +95,14 @@ def grid_search(args):
 
 def gen_script(args, runs):
     with open('submit_%s_%s_%s.sh' % (args.dataset, args.network, args.optimizer), 'w') as f:
+        if args.machine == 'dalabgpu':
+            f.write('#/bin/bash\n')
         for cnt, run in enumerate(runs):
-            f.write('bsub -W 04:00 -n 2 -M 16GB -R "rusage[mem=8192,ngpus_excl_p=1]" -R "select[gpu_model0==GeForceGTX1080Ti]" -oo $SCRATCH/KFAC_jobs/%s_%s_%s_%d.txt %s\n'
-                    % (args.dataset, args.network, args.optimizer, int(time.time()+cnt), run))
+            if args.machine == 'dalabgpu':
+                f.write('%s\n' % run)
+            else:
+                f.write('bsub -W 04:00 -n 2 -M 16GB -R "rusage[mem=8192,ngpus_excl_p=1]" -R "select[gpu_model0==GeForceGTX1080Ti]" -oo $SCRATCH/KFAC_jobs/%s_%s_%s_%d.txt %s\n'
+                        % (args.dataset, args.network, args.optimizer, int(time.time()+cnt), run))
 
 
 if __name__ == '__main__':
