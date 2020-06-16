@@ -5,7 +5,7 @@ from optimizers import (KFACOptimizer, EKFACOptimizer)
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.optim.lr_scheduler import MultiStepLR
+from torch.optim.lr_scheduler import (MultiStepLR, ReduceLROnPlateau)
 
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
@@ -114,7 +114,8 @@ else:
     raise NotImplementedError
 
 if args.milestone is None:
-    lr_scheduler = MultiStepLR(optimizer, milestones=[int(args.epoch*0.5), int(args.epoch*0.75)], gamma=0.1)
+    lr_scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.5, patience=1)
+    #lr_scheduler = MultiStepLR(optimizer, milestones=[int(args.epoch*0.5), int(args.epoch*0.75)], gamma=0.1)
 else:
     milestone = [int(_) for _ in args.milestone.split(',')]
     lr_scheduler = MultiStepLR(optimizer, milestones=milestone, gamma=0.1)
@@ -155,9 +156,9 @@ def train(epoch):
     total = 0
 
     desc = ('[%s][LR=%s] Loss: %.3f | Acc: %.3f%% (%d/%d)' %
-            (tag, lr_scheduler.get_last_lr(), 0, 0, correct, total))
+            (tag, optimizer.param_groups[0]['lr'], 0, 0, correct, total))
 
-    writer.add_scalar('train/lr', lr_scheduler.get_last_lr(), epoch)
+    writer.add_scalar('train/lr', optimizer.param_groups[0]['lr'], epoch)
 
     prog_bar = tqdm(enumerate(trainloader), total=len(trainloader), desc=desc, leave=True)
     for batch_idx, (inputs, targets) in prog_bar:
@@ -183,7 +184,7 @@ def train(epoch):
         correct += predicted.eq(targets).sum().item()
 
         desc = ('[%s][LR=%s] Loss: %.3f | Acc: %.3f%% (%d/%d)' %
-                (tag, lr_scheduler.get_last_lr(), train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
+                (tag, optimizer.param_groups[0]['lr'], train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
         prog_bar.set_description(desc, refresh=True)
 
     writer.add_scalar('train/loss', train_loss/(batch_idx + 1), epoch)
@@ -197,7 +198,7 @@ def test(epoch):
     correct = 0
     total = 0
     desc = ('[%s][LR=%s] Loss: %.3f | Acc: %.3f%% (%d/%d)'
-            % (tag,lr_scheduler.get_last_lr(), test_loss/(0+1), 0, correct, total))
+            % (tag, optimizer.param_groups[0]['lr'], test_loss/(0+1), 0, correct, total))
 
     prog_bar = tqdm(enumerate(testloader), total=len(testloader), desc=desc, leave=True)
     with torch.no_grad():
@@ -212,14 +213,15 @@ def test(epoch):
             correct += predicted.eq(targets).sum().item()
 
             desc = ('[%s][LR=%s] Loss: %.3f | Acc: %.3f%% (%d/%d)'
-                    % (tag, lr_scheduler.get_last_lr(), test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
+                    % (tag, optimizer.param_groups[0]['lr'], test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
             prog_bar.set_description(desc, refresh=True)
 
     # Save checkpoint.
-    acc = 100.*correct/total
+    test_loss / (batch_idx + 1)
+    acc = 100. * correct / total
 
-    writer.add_scalar('test/loss', test_loss / (batch_idx + 1), epoch)
-    writer.add_scalar('test/acc', 100. * correct / total, epoch)
+    writer.add_scalar('test/loss', test_loss, epoch)
+    writer.add_scalar('test/acc', acc, epoch)
 
     if acc > best_acc:
         print('Saving..')
@@ -238,12 +240,18 @@ def test(epoch):
                                                      args.depth))
         best_acc = acc
 
+    return test_loss
+
+
 
 def main():
     for epoch in range(start_epoch, args.epoch):
         train(epoch)
-        test(epoch)
-        lr_scheduler.step()
+        test_loss = test(epoch)
+        if args.milestone == None:
+            lr_scheduler.step(test_loss)
+        else:
+            lr_scheduler.step()
     return best_acc
 
 
