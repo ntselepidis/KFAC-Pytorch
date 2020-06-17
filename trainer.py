@@ -45,7 +45,7 @@ flag_dict = {
 def grid_search(args):
     runs = []
     # Parameters
-    batch_sizes = [200, 500, 1000]
+    batch_sizes = [500, 1000]
     momentums = [0.0, 0.9]
     learning_rates = [1]
     wd = 1e-4
@@ -67,7 +67,7 @@ def grid_search(args):
                    '--learning_rate %f ' \
                    '--momentum %f ' \
                    '--weight_decay %f ' \
-                   '--TInv %f %s'
+                   '--TInv %d %s'
 #                   '--milestone 40,80 '
 
         for bs in batch_sizes:
