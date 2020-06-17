@@ -45,10 +45,11 @@ flag_dict = {
 def grid_search(args):
     runs = []
     # Parameters
-    batch_sizes = [1000]
+    batch_sizes = [200, 500, 1000]
     momentums = [0.0, 0.9]
     learning_rates = [1]
     wd = 1e-4
+    TInvs = [50, 100, 500]
     flags = flag_dict[args.network]
 
     # Temporary hack
@@ -65,13 +66,15 @@ def grid_search(args):
                    '--epoch 100 ' \
                    '--learning_rate %f ' \
                    '--momentum %f ' \
-                   '--weight_decay %f %s'
+                   '--weight_decay %f ' \
+                   '--TInv %f %s'
 #                   '--milestone 40,80 '
 
         for bs in batch_sizes:
-            for mom in momentums:
-                for lr in learning_rates:
-                    runs.append(template % (args.dataset, args_network, args.optimizer, bs, lr, mom, wd, flags))
+            for tinv in TInvs:
+                for mom in momentums:
+                    for lr in learning_rates:
+                        runs.append(template % (args.dataset, args_network, args.optimizer, bs, lr, mom, wd, tinv, flags))
 
     elif args.optimizer in ['sgd', 'adam']:
         template = 'python main.py ' \
