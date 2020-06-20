@@ -45,11 +45,11 @@ flag_dict = {
 def grid_search(args):
     runs = []
     # Parameters
-    batch_sizes = [500, 1000]
+    batch_sizes = [32, 128, 512]
     momentums = [0.0, 0.9]
-    learning_rates = [1]
+    learning_rates = [0.001, 0.01]
     wd = 1e-4
-    TInvs = [50, 100, 500]
+    TInvs = [100]
     flags = flag_dict[args.network]
 
     # Temporary hack
@@ -82,7 +82,7 @@ def grid_search(args):
                    '--network %s ' \
                    '--optimizer %s ' \
                    '--batch_size %d ' \
-                   '--epoch 200 ' \
+                   '--epoch 100 ' \
                    '--learning_rate %f ' \
                    '--momentum %f ' \
                    '--weight_decay %f %s'
