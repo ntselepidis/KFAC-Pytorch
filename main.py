@@ -33,11 +33,19 @@ parser.add_argument('--resume', '-r', action='store_true')
 parser.add_argument('--load_path', default='', type=str)
 parser.add_argument('--log_dir', default='runs/pretrain', type=str)
 
-
+# Algorithms and hyperparameters
 parser.add_argument('--optimizer', default='kfac', type=str)
 parser.add_argument('--batch_size', default=64, type=int)
 parser.add_argument('--epoch', default=100, type=int)
-parser.add_argument('--milestone', default=None, type=str)
+
+# lr_sched = 'plateau' or 'multistep'
+parser.add_argument('--lr_sched', default='plateau', type=str)
+# ReduceLROnPlateau params
+parser.add_argument('--lr_sched_factor', default=0.1, type=float)
+parser.add_argument('--lr_sched_patience', default=10, type=int)
+# MultiStepLR params
+parser.add_argument('--lr_sched_milestone', default=None, type=str)
+
 parser.add_argument('--learning_rate', default=0.01, type=float)
 parser.add_argument('--momentum', default=0.9, type=float)
 parser.add_argument('--stat_decay', default=0.95, type=float)
@@ -202,7 +210,7 @@ def main():
     for epoch in range(start_epoch, args.epoch):
         train(epoch)
         test_loss = test(epoch)
-        if args.milestone == None:
+        if args.lr_sched == 'plateau':
             lr_scheduler.step(test_loss)
         else:
             lr_scheduler.step()
