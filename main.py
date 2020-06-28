@@ -1,21 +1,19 @@
 '''Train CIFAR10/CIFAR100 with PyTorch.'''
 import argparse
 import os
-from optimizers import (KFACOptimizer, EKFACOptimizer)
 import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.optim.lr_scheduler import (MultiStepLR, ReduceLROnPlateau)
 
 from tqdm import tqdm
 from tensorboardX import SummaryWriter
 from utils.network_utils import get_network
 from utils.data_utils import get_dataloader
+from utils.optim_utils import get_optimizer
+from utils.lr_scheduler_utils import get_lr_scheduler
+from utils.log_utils import get_log_dir
 
 
 # fetch args
 parser = argparse.ArgumentParser()
-
 
 parser.add_argument('--network', default='vgg16_bn', type=str)
 parser.add_argument('--depth', default=0, type=int)
@@ -74,54 +72,16 @@ trainloader, testloader = get_dataloader(dataset=args.dataset,
                                          train_batch_size=args.batch_size,
                                          test_batch_size=256)
 
-# init optimizer and lr scheduler
+# init optimizer
 optim_name = args.optimizer.lower()
 tag = optim_name
-if optim_name == 'sgd':
-    optimizer = optim.SGD(net.parameters(),
-                          lr=args.learning_rate,
-                          momentum=args.momentum,
-                          weight_decay=args.weight_decay)
-elif optim_name == 'adam':
-    optimizer = optim.Adam(net.parameters(),
-                           lr=args.learning_rate,
-                           betas=(args.momentum, 0.999),
-                           eps=1e-8,
-                           weight_decay=args.weight_decay,
-                           amsgrad=False)
-elif optim_name == 'kfac':
-    optimizer = KFACOptimizer(net,
-                              lr=args.learning_rate,
-                              momentum=args.momentum,
-                              stat_decay=args.stat_decay,
-                              damping=args.damping,
-                              kl_clip=args.kl_clip,
-                              weight_decay=args.weight_decay,
-                              TCov=args.TCov,
-                              TInv=args.TInv)
-elif optim_name == 'ekfac':
-    optimizer = EKFACOptimizer(net,
-                               lr=args.learning_rate,
-                               momentum=args.momentum,
-                               stat_decay=args.stat_decay,
-                               damping=args.damping,
-                               kl_clip=args.kl_clip,
-                               weight_decay=args.weight_decay,
-                               TCov=args.TCov,
-                               TScal=args.TScal,
-                               TInv=args.TInv)
-else:
-    raise NotImplementedError
+optimizer = get_optimizer(optim_name, net, args)
 
-if args.milestone is None:
-    lr_scheduler = ReduceLROnPlateau(optimizer, 'min', factor=0.1, patience=10, min_lr=1e-7)
-    #lr_scheduler = MultiStepLR(optimizer, milestones=[int(args.epoch*0.5), int(args.epoch*0.75)], gamma=0.1)
-else:
-    milestone = [int(_) for _ in args.milestone.split(',')]
-    lr_scheduler = MultiStepLR(optimizer, milestones=milestone, gamma=0.1)
+# init lr scheduler
+lr_scheduler = get_lr_scheduler(optimizer, args)
 
 # init criterion
-criterion = nn.CrossEntropyLoss()
+criterion = torch.nn.CrossEntropyLoss()
 
 start_epoch = 0
 best_acc = 0
@@ -135,43 +95,7 @@ if args.resume:
     print('==> Loaded checkpoint at epoch: %d, acc: %.2f%%' % (start_epoch, best_acc))
 
 # init summary writter
-if args.depth == 0:
-    args_depth = ""
-else:
-    args_depth = str(args.depth)
-
-if optim_name == 'sgd' or optim_name == 'adam':
-    log_dir = os.path.join(args.log_dir, args.dataset, args.network + args_depth, args.optimizer,
-                           'bs%d_lr%.2f_mom%.2f_wd%.4f' %
-                           (args.batch_size,
-                            args.learning_rate,
-                            args.momentum,
-                            args.weight_decay))
-elif optim_name == 'kfac':
-    log_dir = os.path.join(args.log_dir, args.dataset, args.network + args_depth, args.optimizer,
-                           'bs%d_lr%.2f_mom%.2f_wd%.4f_sd%.4f_dmp%.4f_kl%.4f_TCov%d_TInv%d' %
-                           (args.batch_size,
-                            args.learning_rate,
-                            args.momentum,
-                            args.weight_decay,
-                            args.stat_decay,
-                            args.damping,
-                            args.kl_clip,
-                            args.TCov,
-                            args.TInv))
-elif optim_name == 'ekfac':
-    log_dir = os.path.join(args.log_dir, args.dataset, args.network + args_depth, args.optimizer,
-                           'bs%d_lr%.2f_mom%.2f_wd%.4f_sd%.4f_dmp%.4f_kl%.4f_TCov%d_TInv%d_TScal%d' %
-                           (args.batch_size,
-                            args.learning_rate,
-                            args.momentum,
-                            args.weight_decay,
-                            args.stat_decay,
-                            args.damping,
-                            args.kl_clip,
-                            args.TCov,
-                            args.TInv,
-                            args.TScal))
+log_dir = get_log_dir(optim_name, args)
 
 if not os.path.isdir(log_dir):
     os.makedirs(log_dir)
