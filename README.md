@@ -1,14 +1,6 @@
 # K-FAC_pytorch
 Pytorch implementation of [K-FAC](https://arxiv.org/abs/1503.05671) and [E-KFAC](https://arxiv.org/abs/1806.03884). (Only supports single-GPU training, needs modifications for multi-GPU.)
-## Requirements
-```
-pytorch 0.4.0
-torchvision
-python 3.6.0
-tqdm
-tensorboardX
-tensorflow
-```
+
 ## How to run
 ```
 python main.py --dataset cifar10 --optimizer kfac --network vgg16_bn  --epoch 100 --milestone 40,80 --learning_rate 0.01 --damping 0.03 --weight_decay 0.003
