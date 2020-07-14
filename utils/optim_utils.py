@@ -1,4 +1,4 @@
-from optimizers import (KFACOptimizer, EKFACOptimizer)
+from optimizers import (KFACOptimizer, EKFACOptimizer, GKFACOptimizer)
 import torch
 
 def get_optimizer(optim_name, net, args):
@@ -24,6 +24,16 @@ def get_optimizer(optim_name, net, args):
                                   weight_decay=args.weight_decay,
                                   TCov=args.TCov,
                                   TInv=args.TInv)
+    elif optim_name == 'gkfac':
+        optimizer = GKFACOptimizer(net,
+                                   lr=args.learning_rate,
+                                   momentum=args.momentum,
+                                   stat_decay=args.stat_decay,
+                                   damping=args.damping,
+                                   kl_clip=args.kl_clip,
+                                   weight_decay=args.weight_decay,
+                                   TCov=args.TCov,
+                                   TInv=args.TInv)
     elif optim_name == 'ekfac':
         optimizer = EKFACOptimizer(net,
                                    lr=args.learning_rate,

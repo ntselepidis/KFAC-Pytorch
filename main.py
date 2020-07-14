@@ -128,7 +128,7 @@ def train(epoch):
         optimizer.zero_grad()
         outputs = net(inputs)
         loss = criterion(outputs, targets)
-        if optim_name in ['kfac', 'ekfac'] and optimizer.steps % optimizer.TCov == 0:
+        if optim_name in ['kfac', 'ekfac', 'gkfac'] and optimizer.steps % optimizer.TCov == 0:
             # compute true fisher
             optimizer.acc_stats = True
             with torch.no_grad():

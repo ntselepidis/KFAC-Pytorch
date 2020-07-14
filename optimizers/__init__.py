@@ -1,5 +1,6 @@
 from .kfac import KFACOptimizer
 from .ekfac import EKFACOptimizer
+from .gkfac import GKFACOptimizer
 
 
 def get_optimizer(name):
@@ -7,5 +8,7 @@ def get_optimizer(name):
         return KFACOptimizer
     elif name == 'ekfac':
         return EKFACOptimizer
+    elif name == 'gkfac':
+        return GKFACOptimizer
     else:
         raise NotImplementedError
