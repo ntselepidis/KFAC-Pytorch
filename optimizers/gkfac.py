@@ -5,6 +5,7 @@ import torch.optim as optim
 
 from utils.kfac_utils import (ComputeCovA, ComputeCovG)
 from utils.kfac_utils import update_running_stat
+from utils.kfac_utils import sum_kron
 
 
 class GKFACOptimizer(optim.Optimizer):
@@ -18,7 +19,8 @@ class GKFACOptimizer(optim.Optimizer):
                  weight_decay=0,
                  TCov=10,
                  TInv=100,
-                 batch_averaged=True):
+                 batch_averaged=True,
+                 batch_size=64):
         if lr < 0.0:
             raise ValueError("Invalid learning rate: {}".format(lr))
         if momentum < 0.0:
@@ -43,10 +45,22 @@ class GKFACOptimizer(optim.Optimizer):
 
         self.steps = 0
 
+        # one-level KFAC vars
         self.m_aa, self.m_gg = {}, {}
         self.Q_a, self.Q_g = {}, {}
         self.d_a, self.d_g = {}, {}
         self.stat_decay = stat_decay
+
+        # two-level KFAC vars
+        self.batch_size = batch_size
+        self.nlayers = len(self.modules)
+        self.a = [[] for l in range(self.nlayers)]
+        self.g = [[] for l in range(self.nlayers)]
+        self.all_aa = [[[] for i in range(self.nlayers)] for j in range(self.nlayers)]
+        self.all_gg = [[[] for i in range(self.nlayers)] for j in range(self.nlayers)]
+        self.coarse_F = torch.zeros(self.nlayers, self.nlayers)
+        # self.coarse_L = torch.zeros(self.nlayers, self.nlayers)
+        self.coarse_F_inverse = torch.zeros(self.nlayers, self.nlayers)
 
         self.kl_clip = kl_clip
         self.TCov = TCov
@@ -54,20 +68,65 @@ class GKFACOptimizer(optim.Optimizer):
 
     def _save_input(self, module, input):
         if torch.is_grad_enabled() and self.steps % self.TCov == 0:
-            aa = self.CovAHandler(input[0].data, module)
-            # Initialize buffers
+            # Get module index
+            i = self.modules.index(module)
+            (aa, self.a[i]) = self.CovAHandler(input[0].data, module)
+            # Initialize buffer
             if self.steps == 0:
                 self.m_aa[module] = torch.diag(aa.new(aa.size(0)).fill_(1))
             update_running_stat(aa, self.m_aa[module], self.stat_decay)
+            # Update off-diagonal blocks of A
+            for j in range(i):
+                # Get number of rows and cols of a_i and a_j
+                rows_i, cols_i = self.a[i].size()
+                rows_j, cols_j = self.a[j].size()
+                # Downsample if needed to compute inter-layer covariances
+                if (rows_i != rows_j):
+                    spatial_dim_i = int(math.sqrt( rows_i / self.batch_size ))
+                    spatial_dim_j = int(math.sqrt( rows_j / self.batch_size ))
+                    dsmpl = self.a[j].view(self.batch_size, spatial_dim_j, spatial_dim_j, -1).permute(0, 3, 1, 2)
+                    self.a[j] = torch.nn.functional.interpolate(dsmpl, (spatial_dim_i, spatial_dim_i)).permute(0, 2, 3, 1)
+                    self.a[j] = self.a[j].view(-1, self.a[j].size(-1)) # Downsampled
+                # Compute inter-layer covariance A_{i,j}
+                new_aa = self.a[i].t() @ (self.a[j] / self.batch_size)
+                # Initialize buffer
+                if self.steps == 0:
+                    self.all_aa[i][j] = torch.eye(cols_i, cols_j)
+                update_running_stat(new_aa, self.all_aa[i][j], self.stat_decay)
+            # Update diagonal block of A
+            self.all_aa[i][i] = self.m_aa[module]
 
     def _save_grad_output(self, module, grad_input, grad_output):
         # Accumulate statistics for Fisher matrices
         if self.acc_stats and self.steps % self.TCov == 0:
-            gg = self.CovGHandler(grad_output[0].data, module, self.batch_averaged)
+            # Get module index
+            i = self.modules.index(module)
+            (gg, self.g[i]) = self.CovGHandler(grad_output[0].data, module, self.batch_averaged)
             # Initialize buffers
             if self.steps == 0:
                 self.m_gg[module] = torch.diag(gg.new(gg.size(0)).fill_(1))
             update_running_stat(gg, self.m_gg[module], self.stat_decay)
+            # Update off-diagonal blocks of G
+            for j in range(i, self.nlayers):
+                # Get number of rows and cols of g_i and g_j
+                rows_i, cols_i = self.g[i].size()
+                rows_j, cols_j = self.g[j].size()
+                # Downsample if needed to compute inter-layer covariances
+                if (rows_i != rows_j):
+                    spatial_dim_i = int(math.sqrt( rows_i / self.batch_size ))
+                    spatial_dim_j = int(math.sqrt( rows_j / self.batch_size ))
+                    dsmpl = self.g[j].view(self.batch_size, spatial_dim_j, spatial_dim_j, -1).permute(0, 3, 1, 2)
+                    self.g[j] = torch.nn.functional.interpolate(dsmpl, (spatial_dim_i, spatial_dim_i)).permute(0, 2, 3, 1)
+                    self.g[j] = self.g[j].view(-1, self.g[j].size(-1)) # Downsampled
+                # Compute inter-layer covariance G_{i,j}
+                new_gg = self.g[i].t() @ (self.g[j] / self.batch_size)
+                # Initialize buffer
+                if self.steps == 0:
+                    self.all_gg[i][j] = torch.eye(cols_i, cols_j)
+                # update_running_stat(new_gg, self.all_gg[i][j], self.stat_decay)
+                self.all_gg[i][j] = self.stat_decay * self.all_gg[i][j] + (1 - self.stat_decay) * new_gg
+            # Update diagonal block of A
+            self.all_gg[i][i] = self.m_gg[module]
 
     def _prepare_model(self):
         count = 0
@@ -96,6 +155,24 @@ class GKFACOptimizer(optim.Optimizer):
 
         self.d_a[m].mul_((self.d_a[m] > eps).float())
         self.d_g[m].mul_((self.d_g[m] > eps).float())
+
+    def _update_coarse_fisher_inv(self):
+        group = self.param_groups[0]
+        damping = group['damping']
+        # Compute lower triangular part of coarse Fisher matrix
+        for i in range(self.nlayers):
+            for j in range(i):
+                self.coarse_F[i][j] = sum_kron( self.all_aa[i][j], self.all_gg[j][i].t() )
+        # Fill upper triangular part of coarse Fisher matrix
+        self.coarse_F = self.coarse_F + self.coarse_F.t()
+        # Fill main diagonal of coarse Fisher matrix
+        for i in range(self.nlayers):
+            self.coarse_F[i][i] = sum_kron( self.all_aa[i][i], self.all_gg[i][i] )# + damping
+        # Compute coarse Fisher inverse
+        self.coarse_F_inverse = torch.inverse(self.coarse_F)
+        # self.coarse_L = torch.cholesky(self.coarse_F)
+        # self.coarse_F_inverse = torch.cholesky_inverse(self.coarse_L)
+
 
     @staticmethod
     def _get_matrix_form_grad(m, classname):
@@ -182,14 +259,31 @@ class GKFACOptimizer(optim.Optimizer):
         group = self.param_groups[0]
         lr = group['lr']
         damping = group['damping']
+        # Update 2-level preconditioner
+        if self.steps % self.TInv == 0:
+            # Update layer inverses (diagonal blocks of fine Fisher)
+            for m in self.modules:
+                self._update_inv(m)
+            # Recompute and invert coarse Fisher
+            self._update_coarse_fisher_inv()
+        # Compute fine part of natural gradient and assemble coarse rhs
         updates = {}
+        coarse_rhs = torch.zeros(self.nlayers, 1)
         for m in self.modules:
             classname = m.__class__.__name__
-            if self.steps % self.TInv == 0:
-                self._update_inv(m)
             p_grad_mat = self._get_matrix_form_grad(m, classname)
+            coarse_rhs[self.modules.index(m)] = torch.sum(p_grad_mat)
             v = self._get_natural_grad(m, p_grad_mat, damping)
             updates[m] = v
+        # Compute coarse part of natural gradient
+        coarse_v = self.coarse_F_inverse @ coarse_rhs
+        # Add fine and coarse parts of natural gradient
+        for m in self.modules:
+            coarse_v_m = coarse_v[self.modules.index(m)]
+            updates[m][0] = updates[m][0] + coarse_v_m
+            if m.bias is not None:
+                updates[m][1] = updates[m][1] + coarse_v_m
+        # Clip and update gradient
         self._kl_clip_and_update_grad(updates, lr)
 
         self._step(closure)

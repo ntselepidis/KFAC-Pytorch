@@ -2,6 +2,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+def sum_kron(A, G):
+    A_rows, A_cols = A.size()
+    G_rows, G_cols = G.size()
+    X = torch.ones(G_cols, A_rows)
+    return torch.sum(G @ X @ A)
 
 def try_contiguous(x):
     if not x.is_contiguous():
@@ -95,15 +100,15 @@ class ComputeCovA:
     @classmethod
     def __call__(cls, a, layer):
         if isinstance(layer, nn.Linear):
-            cov_a = cls.linear(a, layer)
+            (cov_a, a) = cls.linear(a, layer)
         elif isinstance(layer, nn.Conv2d):
-            cov_a = cls.conv2d(a, layer)
+            (cov_a, a) = cls.conv2d(a, layer)
         else:
             # FIXME(CW): for extension to other layers.
             # raise NotImplementedError
             cov_a = None
 
-        return cov_a
+        return (cov_a, a)
 
     @staticmethod
     def conv2d(a, layer):
@@ -115,7 +120,7 @@ class ComputeCovA:
             a = torch.cat([a, a.new(a.size(0), 1).fill_(1)], 1)
         a = a/spatial_size
         # FIXME(CW): do we need to divide the output feature map's size?
-        return a.t() @ (a / batch_size)
+        return (a.t() @ (a / batch_size), a)
 
     @staticmethod
     def linear(a, layer):
@@ -123,7 +128,7 @@ class ComputeCovA:
         batch_size = a.size(0)
         if layer.bias is not None:
             a = torch.cat([a, a.new(a.size(0), 1).fill_(1)], 1)
-        return a.t() @ (a / batch_size)
+        return (a.t() @ (a / batch_size), a)
 
 
 class ComputeCovG:
@@ -142,13 +147,13 @@ class ComputeCovG:
     @classmethod
     def __call__(cls, g, layer, batch_averaged):
         if isinstance(layer, nn.Conv2d):
-            cov_g = cls.conv2d(g, layer, batch_averaged)
+            (cov_g, g) = cls.conv2d(g, layer, batch_averaged)
         elif isinstance(layer, nn.Linear):
-            cov_g = cls.linear(g, layer, batch_averaged)
+            (cov_g, g) = cls.linear(g, layer, batch_averaged)
         else:
             cov_g = None
 
-        return cov_g
+        return (cov_g, g)
 
     @staticmethod
     def conv2d(g, layer, batch_averaged):
@@ -165,7 +170,7 @@ class ComputeCovG:
         g = g * spatial_size
         cov_g = g.t() @ (g / g.size(0))
 
-        return cov_g
+        return (cov_g, g)
 
     @staticmethod
     def linear(g, layer, batch_averaged):
@@ -176,7 +181,7 @@ class ComputeCovG:
             cov_g = g.t() @ (g * batch_size)
         else:
             cov_g = g.t() @ (g / batch_size)
-        return cov_g
+        return (cov_g, g)
 
 
 

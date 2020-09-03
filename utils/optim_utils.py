@@ -33,7 +33,8 @@ def get_optimizer(optim_name, net, args):
                                    kl_clip=args.kl_clip,
                                    weight_decay=args.weight_decay,
                                    TCov=args.TCov,
-                                   TInv=args.TInv)
+                                   TInv=args.TInv,
+                                   batch_size=args.batch_size)
     elif optim_name == 'ekfac':
         optimizer = EKFACOptimizer(net,
                                    lr=args.learning_rate,
