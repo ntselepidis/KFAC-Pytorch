@@ -5,7 +5,7 @@ import torch.nn.functional as F
 def sum_kron(A, G):
     A_rows, A_cols = A.size()
     G_rows, G_cols = G.size()
-    X = torch.ones(G_cols, A_rows)
+    X = torch.ones(G_cols, A_rows, device=A.device)
     return torch.sum(G @ X @ A)
 
 def try_contiguous(x):

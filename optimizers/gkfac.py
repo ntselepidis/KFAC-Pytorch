@@ -58,9 +58,6 @@ class GKFACOptimizer(optim.Optimizer):
         self.g = [[] for l in range(self.nlayers)]
         self.all_aa = [[[] for i in range(self.nlayers)] for j in range(self.nlayers)]
         self.all_gg = [[[] for i in range(self.nlayers)] for j in range(self.nlayers)]
-        self.coarse_F = torch.zeros(self.nlayers, self.nlayers)
-        # self.coarse_L = torch.zeros(self.nlayers, self.nlayers)
-        self.coarse_F_inverse = torch.zeros(self.nlayers, self.nlayers)
 
         self.kl_clip = kl_clip
         self.TCov = TCov
@@ -86,12 +83,12 @@ class GKFACOptimizer(optim.Optimizer):
                     spatial_dim_j = int(math.sqrt( rows_j / self.batch_size ))
                     dsmpl = self.a[j].view(self.batch_size, spatial_dim_j, spatial_dim_j, -1).permute(0, 3, 1, 2)
                     self.a[j] = torch.nn.functional.interpolate(dsmpl, (spatial_dim_i, spatial_dim_i)).permute(0, 2, 3, 1)
-                    self.a[j] = self.a[j].view(-1, self.a[j].size(-1)) # Downsampled
+                    self.a[j] = self.a[j].reshape(-1, self.a[j].size(-1)) # Downsampled
                 # Compute inter-layer covariance A_{i,j}
                 new_aa = self.a[i].t() @ (self.a[j] / self.batch_size)
                 # Initialize buffer
                 if self.steps == 0:
-                    self.all_aa[i][j] = torch.eye(cols_i, cols_j)
+                    self.all_aa[i][j] = torch.eye(cols_i, cols_j, device=new_aa.device)
                 update_running_stat(new_aa, self.all_aa[i][j], self.stat_decay)
             # Update diagonal block of A
             self.all_aa[i][i] = self.m_aa[module]
@@ -117,12 +114,12 @@ class GKFACOptimizer(optim.Optimizer):
                     spatial_dim_j = int(math.sqrt( rows_j / self.batch_size ))
                     dsmpl = self.g[j].view(self.batch_size, spatial_dim_j, spatial_dim_j, -1).permute(0, 3, 1, 2)
                     self.g[j] = torch.nn.functional.interpolate(dsmpl, (spatial_dim_i, spatial_dim_i)).permute(0, 2, 3, 1)
-                    self.g[j] = self.g[j].view(-1, self.g[j].size(-1)) # Downsampled
+                    self.g[j] = self.g[j].reshape(-1, self.g[j].size(-1)) # Downsampled
                 # Compute inter-layer covariance G_{i,j}
                 new_gg = self.g[i].t() @ (self.g[j] / self.batch_size)
                 # Initialize buffer
                 if self.steps == 0:
-                    self.all_gg[i][j] = torch.eye(cols_i, cols_j)
+                    self.all_gg[i][j] = torch.eye(cols_i, cols_j, device=new_gg.device)
                 # update_running_stat(new_gg, self.all_gg[i][j], self.stat_decay)
                 self.all_gg[i][j] = self.stat_decay * self.all_gg[i][j] + (1 - self.stat_decay) * new_gg
             # Update diagonal block of A
@@ -159,6 +156,9 @@ class GKFACOptimizer(optim.Optimizer):
     def _update_coarse_fisher_inv(self):
         group = self.param_groups[0]
         damping = group['damping']
+        # Allocate coarse Fisher matrix
+        if self.steps == 0:
+            self.coarse_F = torch.zeros(self.nlayers, self.nlayers, device=self.all_aa[0][0].device)
         # Compute lower triangular part of coarse Fisher matrix
         for i in range(self.nlayers):
             for j in range(i):
@@ -268,7 +268,7 @@ class GKFACOptimizer(optim.Optimizer):
             self._update_coarse_fisher_inv()
         # Compute fine part of natural gradient and assemble coarse rhs
         updates = {}
-        coarse_rhs = torch.zeros(self.nlayers, 1)
+        coarse_rhs = torch.zeros(self.nlayers, 1, device=self.coarse_F.device)
         for m in self.modules:
             classname = m.__class__.__name__
             p_grad_mat = self._get_matrix_form_grad(m, classname)

@@ -11,6 +11,7 @@ from utils.optim_utils import get_optimizer
 from utils.lr_scheduler_utils import get_lr_scheduler
 from utils.log_utils import get_log_dir
 
+torch.manual_seed(0)
 
 # fetch args
 parser = argparse.ArgumentParser()
