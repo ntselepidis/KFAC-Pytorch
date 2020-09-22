@@ -34,7 +34,8 @@ def get_optimizer(optim_name, net, args):
                                    weight_decay=args.weight_decay,
                                    TCov=args.TCov,
                                    TInv=args.TInv,
-                                   batch_size=args.batch_size)
+                                   batch_size=args.batch_size,
+                                   omega=args.omega)
     elif optim_name == 'ekfac':
         optimizer = EKFACOptimizer(net,
                                    lr=args.learning_rate,

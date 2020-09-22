@@ -57,6 +57,10 @@ parser.add_argument('--TCov', default=10, type=int)
 parser.add_argument('--TScal', default=10, type=int)
 parser.add_argument('--TInv', default=100, type=int)
 
+# Weight defining convex combination of fine and coarse solutions in GKFAC
+# GKFAC solution = (1 - omega) * fine + omega * coarse
+parser.add_argument('--omega', default=0.25, type=float)
+
 
 parser.add_argument('--prefix', default=None, type=str)
 args = parser.parse_args()
