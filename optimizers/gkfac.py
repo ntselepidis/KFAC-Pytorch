@@ -50,7 +50,7 @@ class GKFACOptimizer(optim.Optimizer):
         self.m_aa, self.m_gg = {}, {}
         self.Q_a, self.Q_g = {}, {}
         self.d_a, self.d_g = {}, {}
-        self.stat_decay = stat_decay
+        self.stat_decay = 0 # stat_decay
 
         # two-level KFAC vars
         self.batch_size = batch_size
@@ -291,3 +291,4 @@ class GKFACOptimizer(optim.Optimizer):
 
         self._step(closure)
         self.steps += 1
+        self.stat_decay = min( 1.0 - 1.0 / (self.steps + 1), 0.95 )
