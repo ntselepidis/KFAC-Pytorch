@@ -49,7 +49,7 @@ class KFACOptimizer(optim.Optimizer):
         self.Q_a, self.Q_g = {}, {}
         self.d_a, self.d_g = {}, {}
         self.Inv_a, self.Inv_g = {}, {}
-        self.stat_decay = stat_decay
+        self.stat_decay = 0 # stat_decay
 
         self.kl_clip = kl_clip
         self.TCov = TCov
@@ -212,3 +212,4 @@ class KFACOptimizer(optim.Optimizer):
 
         self._step(closure)
         self.steps += 1
+        self.stat_decay = min( 1.0 - 1.0 / (self.steps + 1), 0.95 )
