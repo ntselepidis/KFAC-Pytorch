@@ -20,6 +20,7 @@ class GKFACOptimizer(optim.Optimizer):
                  TCov=10,
                  TInv=100,
                  batch_averaged=True,
+                 solver='symeig',
                  batch_size=64,
                  omega=0.25):
         if lr < 0.0:
@@ -47,9 +48,11 @@ class GKFACOptimizer(optim.Optimizer):
         self.steps = 0
 
         # one-level KFAC vars
+        self.solver = solver
         self.m_aa, self.m_gg = {}, {}
         self.Q_a, self.Q_g = {}, {}
         self.d_a, self.d_g = {}, {}
+        self.Inv_a, self.Inv_g = {}, {}
         self.stat_decay = 0 # stat_decay
 
         # two-level KFAC vars
@@ -142,18 +145,29 @@ class GKFACOptimizer(optim.Optimizer):
                 count += 1
 
     def _update_inv(self, m):
-        """Do eigen decomposition for computing inverse of the ~ fisher.
+        """Do eigen decomposition or approximate factorization for computing inverse of the ~ fisher.
         :param m: The layer
         :return: no returns.
         """
-        eps = 1e-10  # for numerical stability
-        self.d_a[m], self.Q_a[m] = torch.symeig(
-            self.m_aa[m], eigenvectors=True)
-        self.d_g[m], self.Q_g[m] = torch.symeig(
-            self.m_gg[m], eigenvectors=True)
+        if self.solver == 'symeig':
+            eps = 1e-10  # for numerical stability
+            self.d_a[m], self.Q_a[m] = torch.symeig(
+                self.m_aa[m], eigenvectors=True)
+            self.d_g[m], self.Q_g[m] = torch.symeig(
+                self.m_gg[m], eigenvectors=True)
 
-        self.d_a[m].mul_((self.d_a[m] > eps).float())
-        self.d_g[m].mul_((self.d_g[m] > eps).float())
+            self.d_a[m].mul_((self.d_a[m] > eps).float())
+            self.d_g[m].mul_((self.d_g[m] > eps).float())
+        else:
+            group = self.param_groups[0]
+            damping = group['damping']
+            numer = torch.trace(self.m_aa[m]) / (self.m_aa[m].shape[0] + 1)
+            denom = torch.trace(self.m_gg[m]) / (self.m_gg[m].shape[0])
+            pi = numer / denom
+            I_a = torch.eye(self.m_aa[m].shape[0], device=self.m_aa[m].device)
+            I_g = torch.eye(self.m_gg[m].shape[0], device=self.m_gg[m].device)
+            self.Inv_a[m] = torch.inverse(self.m_aa[m] + math.sqrt(damping * pi) * I_a)
+            self.Inv_g[m] = torch.inverse(self.m_gg[m] + math.sqrt(damping / pi) * I_g)
 
     def _update_coarse_fisher_inv(self):
         group = self.param_groups[0]
@@ -199,9 +213,13 @@ class GKFACOptimizer(optim.Optimizer):
         """
         # p_grad_mat is of output_dim * input_dim
         # inv((ss')) p_grad_mat inv(aa') = [ Q_g (1/R_g) Q_g^T ] @ p_grad_mat @ [Q_a (1/R_a) Q_a^T]
-        v1 = self.Q_g[m].t() @ p_grad_mat @ self.Q_a[m]
-        v2 = v1 / (self.d_g[m].unsqueeze(1) * self.d_a[m].unsqueeze(0) + damping)
-        v = self.Q_g[m] @ v2 @ self.Q_a[m].t()
+        if self.solver == 'symeig':
+            v1 = self.Q_g[m].t() @ p_grad_mat @ self.Q_a[m]
+            v2 = v1 / (self.d_g[m].unsqueeze(1) * self.d_a[m].unsqueeze(0) + damping)
+            v = self.Q_g[m] @ v2 @ self.Q_a[m].t()
+        else:
+            v = self.Inv_g[m] @ p_grad_mat @ self.Inv_a[m]
+
         if m.bias is not None:
             # we always put gradient w.r.t weight in [0]
             # and w.r.t bias in [1]
