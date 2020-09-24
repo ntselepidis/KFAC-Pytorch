@@ -23,7 +23,8 @@ def get_optimizer(optim_name, net, args):
                                   kl_clip=args.kl_clip,
                                   weight_decay=args.weight_decay,
                                   TCov=args.TCov,
-                                  TInv=args.TInv)
+                                  TInv=args.TInv,
+                                  solver=args.solver)
     elif optim_name == 'gkfac':
         optimizer = GKFACOptimizer(net,
                                    lr=args.learning_rate,

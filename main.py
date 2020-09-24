@@ -28,7 +28,7 @@ parser.add_argument('--compressionRate', default=2, type=int)
 parser.add_argument('--widen_factor', default=1, type=int)
 parser.add_argument('--dropRate', default=0.0, type=float)
 
-
+# General utils
 parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--resume', '-r', action='store_true')
 parser.add_argument('--load_path', default='', type=str)
@@ -39,14 +39,15 @@ parser.add_argument('--optimizer', default='kfac', type=str)
 parser.add_argument('--batch_size', default=64, type=int)
 parser.add_argument('--epoch', default=100, type=int)
 
-# lr_sched = 'plateau' or 'multistep'
-parser.add_argument('--lr_sched', default='plateau', type=str)
+# Learning rate scheduler (ReduceLROnPlateau, MultiStepLR)
+parser.add_argument('--lr_sched', default='plateau', type=str, choices=['plateau', 'multistep'])
 # ReduceLROnPlateau params
 parser.add_argument('--lr_sched_factor', default=0.1, type=float)
 parser.add_argument('--lr_sched_patience', default=10, type=int)
 # MultiStepLR params
 parser.add_argument('--lr_sched_milestone', default=None, type=str)
 
+# Hyperparameters
 parser.add_argument('--learning_rate', default=0.01, type=float)
 parser.add_argument('--momentum', default=0.9, type=float)
 parser.add_argument('--stat_decay', default=0.95, type=float)
@@ -61,6 +62,9 @@ parser.add_argument('--TInv', default=100, type=int)
 # GKFAC solution = (1 - omega) * fine + omega * coarse
 parser.add_argument('--omega', default=0.25, type=float)
 
+# Technique for inverting diagonal blocks of KFAC
+# solver = 'symeig' or 'approx'
+parser.add_argument('--solver', default='symeig', type=str, choices=['symeig', 'approx'])
 
 parser.add_argument('--prefix', default=None, type=str)
 args = parser.parse_args()
