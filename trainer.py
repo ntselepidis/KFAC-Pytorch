@@ -52,7 +52,7 @@ def grid_search(args):
     if 'resnet' in args_network:
         args_network = 'resnet'
 
-    if args.optimizer in ['kfac', 'ekfac']:
+    if args.optimizer in ['kfac', 'ekfac', 'gkfac']:
         template = 'python main.py ' \
                    '--dataset %s ' \
                    '--network %s ' \
@@ -60,13 +60,15 @@ def grid_search(args):
                    '--batch_size %d ' \
                    '--epoch 100 ' \
                    '--learning_rate %f ' \
+                   '--lr_sched multistep ' \
+                   '--lr_sched_milestone 40,80 ' \
                    '--momentum %f ' \
                    '--damping %f ' \
                    '--weight_decay %f ' \
                    '--kl_clip %f ' \
                    '--TCov %d ' \
-                   '--TInv %d %s'
-#                   '--milestone 40,80 '
+                   '--TInv %d %s ' \
+                   '--solver approx '
         # Parameters
         batch_sizes = [64, 128, 256]
         momentums = [0.0, 0.9]
@@ -74,13 +76,13 @@ def grid_search(args):
         dmp = 1e-3
         wd = 1e-4
         kl_clip = 1e-3
-        TCov = 128*10
-        TInv = 128*100
+        TCov = 128*20
+        TInv = 128*200
         for bs in batch_sizes:
             tcov = int( TCov / bs )
             tinv = int( TInv / bs )
-            for mom in momentums:
-                for lr in learning_rates:
+            for lr in learning_rates:
+                for mom in momentums:
                     runs.append(template % (args.dataset, args_network, args.optimizer, bs, lr, mom, dmp, wd, kl_clip, tcov, tinv, flags))
 
     elif args.optimizer in ['sgd', 'adam']:
@@ -91,17 +93,18 @@ def grid_search(args):
                    '--batch_size %d ' \
                    '--epoch 100 ' \
                    '--learning_rate %f ' \
+                   '--lr_sched multistep ' \
+                   '--lr_sched_milestone 40,80 ' \
                    '--momentum %f ' \
-                   '--weight_decay %f %s'
-#                   '--milestone 60,120,180 '
+                   '--weight_decay %f %s '
         # Parameters
-        batch_sizes = [32]
+        batch_sizes = [64, 128, 256]
         momentums = [0.0, 0.9]
         learning_rates = [1e-3, 1e-2]
         wd = 1e-4
         for bs in batch_sizes:
-            for mom in momentums:
-                for lr in learning_rates:
+            for lr in learning_rates:
+                for mom in momentums:
                     runs.append(template % (args.dataset, args_network, args.optimizer, bs, lr, mom, wd, flags))
 
     return runs
