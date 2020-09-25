@@ -22,7 +22,8 @@ class GKFACOptimizer(optim.Optimizer):
                  batch_averaged=True,
                  solver='symeig',
                  batch_size=64,
-                 omega=0.25):
+                 omega_1=1.0,
+                 omega_2=1.0):
         if lr < 0.0:
             raise ValueError("Invalid learning rate: {}".format(lr))
         if momentum < 0.0:
@@ -57,7 +58,8 @@ class GKFACOptimizer(optim.Optimizer):
 
         # two-level KFAC vars
         self.batch_size = batch_size
-        self.omega = omega
+        self.omega_1 = omega_1
+        self.omega_2 = omega_2
         self.nlayers = len(self.modules)
         self.a = [[] for l in range(self.nlayers)]
         self.g = [[] for l in range(self.nlayers)]
@@ -300,9 +302,9 @@ class GKFACOptimizer(optim.Optimizer):
         # Add fine and coarse parts of natural gradient
         for m in self.modules:
             coarse_v_m = coarse_v[self.modules.index(m)]
-            updates[m][0] = (1 - self.omega) * updates[m][0] + self.omega * coarse_v_m
+            updates[m][0] = self.omega_1 * updates[m][0] + self.omega_2 * coarse_v_m
             if m.bias is not None:
-                updates[m][1] = (1 - self.omega) * updates[m][1] + self.omega * coarse_v_m
+                updates[m][1] = self.omega_1 * updates[m][1] + self.omega_2 * coarse_v_m
 
         # Clip and update gradient
         self._kl_clip_and_update_grad(updates, lr)
