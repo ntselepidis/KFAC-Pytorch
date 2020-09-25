@@ -118,7 +118,7 @@ def gen_script(args, runs):
             if args.machine == 'dalabgpu':
                 f.write('%s\n' % run)
             else:
-                f.write('bsub -W 04:00 -n 2 -M 16GB -R "rusage[mem=8192,ngpus_excl_p=1]" -R "select[gpu_model0==GeForceGTX1080Ti]" -oo $SCRATCH/KFAC_jobs/%s_%s_%s_%d.txt %s\n'
+                f.write('bsub -W 04:00 -n 10 -R "rusage[ngpus_excl_p=1]" -R "select[gpu_model0==GeForceGTX1080Ti]" -oo $SCRATCH/KFAC_jobs/%s_%s_%s_%d.txt %s\n'
                         % (args.dataset, args.network, args.optimizer, int(time.time()+cnt), run))
 
 
