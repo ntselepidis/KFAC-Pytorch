@@ -21,7 +21,6 @@ class GKFACOptimizer(optim.Optimizer):
                  TInv=100,
                  batch_averaged=True,
                  solver='symeig',
-                 batch_size=64,
                  omega_1=1.0,
                  omega_2=1.0):
         if lr < 0.0:
@@ -57,7 +56,6 @@ class GKFACOptimizer(optim.Optimizer):
         self.stat_decay = 0 # stat_decay
 
         # two-level KFAC vars
-        self.batch_size = batch_size
         self.omega_1 = omega_1
         self.omega_2 = omega_2
         self.nlayers = len(self.modules)
@@ -110,7 +108,7 @@ class GKFACOptimizer(optim.Optimizer):
             # Update off-diagonal blocks of A
             for j in range(i):
                 # Compute inter-layer covariances (downsample if needed)
-                new_aa = self._downsample_multiply(self.a, i, j, self.batch_size)
+                new_aa = self._downsample_multiply(self.a, i, j, input[0].shape[0])
                 # Initialize buffer
                 if self.steps == 0:
                     self.all_aa[i][j] = torch.zeros(self.a[i].shape[1], self.a[j].shape[1], device=new_aa.device)
@@ -131,7 +129,7 @@ class GKFACOptimizer(optim.Optimizer):
             # Update off-diagonal blocks of G
             for j in range(i, self.nlayers):
                 # Compute inter-layer covariances (downsample if needed)
-                new_gg = self._downsample_multiply(self.g, i, j, self.batch_size, module, self.batch_averaged)
+                new_gg = self._downsample_multiply(self.g, i, j, grad_output[0].shape[0], module, self.batch_averaged)
                 # Initialize buffer
                 if self.steps == 0:
                     self.all_gg[i][j] = torch.zeros(self.g[i].shape[1], self.g[j].shape[1], device=new_gg.device)
