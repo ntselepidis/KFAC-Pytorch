@@ -174,6 +174,9 @@ class GKFACOptimizer(optim.Optimizer):
             numer = torch.trace(self.m_aa[m]) / (self.m_aa[m].shape[0] + 1)
             denom = torch.trace(self.m_gg[m]) / (self.m_gg[m].shape[0])
             pi = numer / denom
+            assert numer > 0, "trace(A) should be positive"
+            assert denom > 0, "trace(G) should be positive"
+            # assert pi > 0, "pi should be positive"
             I_a = torch.eye(self.m_aa[m].shape[0], device=self.m_aa[m].device)
             I_g = torch.eye(self.m_gg[m].shape[0], device=self.m_gg[m].device)
             self.Inv_a[m] = torch.inverse(self.m_aa[m] + math.sqrt(damping * pi) * I_a)
@@ -249,6 +252,8 @@ class GKFACOptimizer(optim.Optimizer):
             vg_sum += (v[0] * m.weight.grad.data * lr ** 2).sum().item()
             if m.bias is not None:
                 vg_sum += (v[1] * m.bias.grad.data * lr ** 2).sum().item()
+        assert vg_sum != 0, "vg_sum should be non-zero"
+        assert vg_sum > 0, "vg_sum should be positive"
         nu = min(1.0, math.sqrt(self.kl_clip / vg_sum))
 
         for m in self.modules:
