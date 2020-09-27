@@ -123,7 +123,15 @@ class GKFACOptimizer(optim.Optimizer):
                     self.g[j] = torch.nn.functional.interpolate(dsmpl, (spatial_dim_i, spatial_dim_i)).permute(0, 2, 3, 1)
                     self.g[j] = self.g[j].reshape(-1, self.g[j].size(-1)) # Downsampled
                 # Compute inter-layer covariance G_{i,j}
-                new_gg = self.g[i].t() @ (self.g[j] / self.batch_size)
+                if isinstance(module, torch.nn.Conv2d):
+                    new_gg = self.g[i].t() @ (self.g[j] / self.batch_size)
+                elif isinstance(module, torch.nn.Linear):
+                    if self.batch_averaged:
+                        new_gg = self.g[i].t() @ (self.g[j] * self.batch_size)
+                    else:
+                        new_gg = self.g[i].t() @ (self.g[j] / self.batch_size)
+                else:
+                    new_gg = None
                 # Initialize buffer
                 if self.steps == 0:
                     self.all_gg[i][j] = torch.eye(cols_i, cols_j, device=new_gg.device)
