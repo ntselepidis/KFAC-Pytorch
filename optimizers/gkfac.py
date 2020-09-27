@@ -70,6 +70,34 @@ class GKFACOptimizer(optim.Optimizer):
         self.TCov = TCov
         self.TInv = TInv
 
+    @staticmethod
+    def _downsample_multiply(a, i, j, batch_size, module=None, batch_averaged=True): # module should be none for As and set for Gs
+        # Get spatial dimensions of a[i] and a[j]
+        spatial_dim_i = int(math.sqrt( a[i].shape[0] / batch_size ))
+        spatial_dim_j = int(math.sqrt( a[j].shape[0] / batch_size ))
+        if (spatial_dim_i == spatial_dim_j):
+            if isinstance(module, torch.nn.Linear) and batch_averaged:
+                cov_ij = a[i].t() @ (a[j] * batch_size)
+            else:
+                cov_ij = a[i].t() @ (a[j] / batch_size)
+        elif (spatial_dim_j > spatial_dim_i):
+            a_j_dsmpl = a[j].view(batch_size, spatial_dim_j, spatial_dim_j, -1).permute(0, 3, 1, 2)
+            a_j_dsmpl = torch.nn.functional.interpolate(a_j_dsmpl, (spatial_dim_i, spatial_dim_i)).permute(0, 2, 3, 1)
+            a_j_dsmpl = a_j_dsmpl.reshape(-1, a_j_dsmpl.size(-1))
+            if isinstance(module, torch.nn.Linear) and batch_averaged:
+                cov_ij = a[i].t() @ (a_j_dsmpl * batch_size)
+            else:
+                cov_ij = a[i].t() @ (a_j_dsmpl / batch_size)
+        else:
+            a_i_dsmpl = a[i].view(batch_size, spatial_dim_i, spatial_dim_i, -1).permute(0, 3, 1, 2)
+            a_i_dsmpl = torch.nn.functional.interpolate(a_i_dsmpl, (spatial_dim_j, spatial_dim_j)).permute(0, 2, 3, 1)
+            a_i_dsmpl = a_i_dsmpl.reshape(-1, a_i_dsmpl.size(-1))
+            if isinstance(module, torch.nn.Linear) and batch_averaged:
+                cov_ij = a_i_dsmpl.t() @ (a[j] * batch_size)
+            else:
+                cov_ij = a_i_dsmpl.t() @ (a[j] / batch_size)
+        return cov_ij
+
     def _save_input(self, module, input):
         if torch.is_grad_enabled() and self.steps % self.TCov == 0:
             # Get module index
@@ -81,21 +109,11 @@ class GKFACOptimizer(optim.Optimizer):
             update_running_stat(aa, self.m_aa[module], self.stat_decay)
             # Update off-diagonal blocks of A
             for j in range(i):
-                # Get number of rows and cols of a_i and a_j
-                rows_i, cols_i = self.a[i].size()
-                rows_j, cols_j = self.a[j].size()
-                # Downsample if needed to compute inter-layer covariances
-                if (rows_i != rows_j):
-                    spatial_dim_i = int(math.sqrt( rows_i / self.batch_size ))
-                    spatial_dim_j = int(math.sqrt( rows_j / self.batch_size ))
-                    dsmpl = self.a[j].view(self.batch_size, spatial_dim_j, spatial_dim_j, -1).permute(0, 3, 1, 2)
-                    self.a[j] = torch.nn.functional.interpolate(dsmpl, (spatial_dim_i, spatial_dim_i)).permute(0, 2, 3, 1)
-                    self.a[j] = self.a[j].reshape(-1, self.a[j].size(-1)) # Downsampled
-                # Compute inter-layer covariance A_{i,j}
-                new_aa = self.a[i].t() @ (self.a[j] / self.batch_size)
+                # Compute inter-layer covariances (downsample if needed)
+                new_aa = self._downsample_multiply(self.a, i, j, self.batch_size)
                 # Initialize buffer
                 if self.steps == 0:
-                    self.all_aa[i][j] = torch.eye(cols_i, cols_j, device=new_aa.device)
+                    self.all_aa[i][j] = torch.zeros(self.a[i].shape[1], self.a[j].shape[1], device=new_aa.device)
                 update_running_stat(new_aa, self.all_aa[i][j], self.stat_decay)
             # Update diagonal block of A
             self.all_aa[i][i] = self.m_aa[module]
@@ -112,29 +130,11 @@ class GKFACOptimizer(optim.Optimizer):
             update_running_stat(gg, self.m_gg[module], self.stat_decay)
             # Update off-diagonal blocks of G
             for j in range(i, self.nlayers):
-                # Get number of rows and cols of g_i and g_j
-                rows_i, cols_i = self.g[i].size()
-                rows_j, cols_j = self.g[j].size()
-                # Downsample if needed to compute inter-layer covariances
-                if (rows_i != rows_j):
-                    spatial_dim_i = int(math.sqrt( rows_i / self.batch_size ))
-                    spatial_dim_j = int(math.sqrt( rows_j / self.batch_size ))
-                    dsmpl = self.g[j].view(self.batch_size, spatial_dim_j, spatial_dim_j, -1).permute(0, 3, 1, 2)
-                    self.g[j] = torch.nn.functional.interpolate(dsmpl, (spatial_dim_i, spatial_dim_i)).permute(0, 2, 3, 1)
-                    self.g[j] = self.g[j].reshape(-1, self.g[j].size(-1)) # Downsampled
-                # Compute inter-layer covariance G_{i,j}
-                if isinstance(module, torch.nn.Conv2d):
-                    new_gg = self.g[i].t() @ (self.g[j] / self.batch_size)
-                elif isinstance(module, torch.nn.Linear):
-                    if self.batch_averaged:
-                        new_gg = self.g[i].t() @ (self.g[j] * self.batch_size)
-                    else:
-                        new_gg = self.g[i].t() @ (self.g[j] / self.batch_size)
-                else:
-                    new_gg = None
+                # Compute inter-layer covariances (downsample if needed)
+                new_gg = self._downsample_multiply(self.g, i, j, self.batch_size, module, self.batch_averaged)
                 # Initialize buffer
                 if self.steps == 0:
-                    self.all_gg[i][j] = torch.eye(cols_i, cols_j, device=new_gg.device)
+                    self.all_gg[i][j] = torch.zeros(self.g[i].shape[1], self.g[j].shape[1], device=new_gg.device)
                 # update_running_stat(new_gg, self.all_gg[i][j], self.stat_decay)
                 self.all_gg[i][j] = self.stat_decay * self.all_gg[i][j] + (1 - self.stat_decay) * new_gg
             # Update diagonal block of A
@@ -196,7 +196,7 @@ class GKFACOptimizer(optim.Optimizer):
         self.coarse_F = self.coarse_F + self.coarse_F.t()
         # Fill main diagonal of coarse Fisher matrix
         for i in range(self.nlayers):
-            self.coarse_F[i][i] = sum_kron( self.all_aa[i][i], self.all_gg[i][i] )# + damping
+            self.coarse_F[i][i] = sum_kron( self.all_aa[i][i], self.all_gg[i][i] ) + damping
         # Compute coarse Fisher inverse
         self.coarse_F_inverse = torch.inverse(self.coarse_F)
         # self.coarse_L = torch.cholesky(self.coarse_F)
