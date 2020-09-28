@@ -178,9 +178,10 @@ class ComputeCovG:
         batch_size = g.size(0)
 
         if batch_averaged:
-            cov_g = g.t() @ (g * batch_size)
-        else:
-            cov_g = g.t() @ (g / batch_size)
+            g = g * batch_size
+
+        cov_g = g.t() @ (g / batch_size)
+
         return (cov_g, g)
 
 
