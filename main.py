@@ -67,6 +67,10 @@ parser.add_argument('--omega_2', default=1.0, type=float)
 # solver = 'symeig' or 'approx'
 parser.add_argument('--solver', default='symeig', type=str, choices=['symeig', 'approx'])
 
+# Algorithm for downsampling tensors in GKFAC
+# mode = 'nearest' or 'area'
+parser.add_argument('--mode', default='nearest', type=str, choices=['nearest', 'area'])
+
 parser.add_argument('--prefix', default=None, type=str)
 args = parser.parse_args()
 

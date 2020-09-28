@@ -22,7 +22,8 @@ class GKFACOptimizer(optim.Optimizer):
                  batch_averaged=True,
                  solver='symeig',
                  omega_1=1.0,
-                 omega_2=1.0):
+                 omega_2=1.0,
+                 mode='nearest'):
         if lr < 0.0:
             raise ValueError("Invalid learning rate: {}".format(lr))
         if momentum < 0.0:
@@ -58,6 +59,7 @@ class GKFACOptimizer(optim.Optimizer):
         # two-level KFAC vars
         self.omega_1 = omega_1
         self.omega_2 = omega_2
+        self.mode = mode
         self.nlayers = len(self.modules)
         self.a = [[] for l in range(self.nlayers)]
         self.g = [[] for l in range(self.nlayers)]
@@ -69,7 +71,7 @@ class GKFACOptimizer(optim.Optimizer):
         self.TInv = TInv
 
     @staticmethod
-    def _downsample_multiply(a, i, j, batch_size):
+    def _downsample_multiply(a, i, j, batch_size, mode='nearest'):
         # Get spatial dimensions of a[i] and a[j]
         spatial_dim_i = int(math.sqrt( a[i].shape[0] / batch_size ))
         spatial_dim_j = int(math.sqrt( a[j].shape[0] / batch_size ))
@@ -77,12 +79,12 @@ class GKFACOptimizer(optim.Optimizer):
             cov_ij = a[i].t() @ (a[j] / batch_size)
         elif (spatial_dim_j > spatial_dim_i):
             a_j_dsmpl = a[j].view(batch_size, spatial_dim_j, spatial_dim_j, -1).permute(0, 3, 1, 2)
-            a_j_dsmpl = torch.nn.functional.interpolate(a_j_dsmpl, (spatial_dim_i, spatial_dim_i)).permute(0, 2, 3, 1)
+            a_j_dsmpl = torch.nn.functional.interpolate(a_j_dsmpl, (spatial_dim_i, spatial_dim_i), mode=mode).permute(0, 2, 3, 1)
             a_j_dsmpl = a_j_dsmpl.reshape(-1, a_j_dsmpl.size(-1))
             cov_ij = a[i].t() @ (a_j_dsmpl / batch_size)
         else:
             a_i_dsmpl = a[i].view(batch_size, spatial_dim_i, spatial_dim_i, -1).permute(0, 3, 1, 2)
-            a_i_dsmpl = torch.nn.functional.interpolate(a_i_dsmpl, (spatial_dim_j, spatial_dim_j)).permute(0, 2, 3, 1)
+            a_i_dsmpl = torch.nn.functional.interpolate(a_i_dsmpl, (spatial_dim_j, spatial_dim_j), mode=mode).permute(0, 2, 3, 1)
             a_i_dsmpl = a_i_dsmpl.reshape(-1, a_i_dsmpl.size(-1))
             cov_ij = a_i_dsmpl.t() @ (a[j] / batch_size)
         return cov_ij
@@ -99,7 +101,7 @@ class GKFACOptimizer(optim.Optimizer):
             # Update off-diagonal blocks of A
             for j in range(i):
                 # Compute inter-layer covariances (downsample if needed)
-                new_aa = self._downsample_multiply(self.a, i, j, input[0].shape[0])
+                new_aa = self._downsample_multiply(self.a, i, j, input[0].shape[0], self.mode)
                 # Initialize buffer
                 if self.steps == 0:
                     self.all_aa[i][j] = torch.zeros(self.a[i].shape[1], self.a[j].shape[1], device=new_aa.device)
@@ -120,7 +122,7 @@ class GKFACOptimizer(optim.Optimizer):
             # Update off-diagonal blocks of G
             for j in range(i, self.nlayers):
                 # Compute inter-layer covariances (downsample if needed)
-                new_gg = self._downsample_multiply(self.g, i, j, grad_output[0].shape[0])
+                new_gg = self._downsample_multiply(self.g, i, j, grad_output[0].shape[0], self.mode)
                 # Initialize buffer
                 if self.steps == 0:
                     self.all_gg[i][j] = torch.zeros(self.g[i].shape[1], self.g[j].shape[1], device=new_gg.device)

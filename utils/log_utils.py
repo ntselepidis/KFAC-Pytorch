@@ -27,6 +27,8 @@ def get_log_dir(optim_name, args):
         if optim_name == 'gkfac':
             args_optimizer = args_optimizer + '(' + str(args.omega_1) + ', ' + str(args.omega_2) + ')'
         args_optimizer = args_optimizer + '_' + args.solver
+        if optim_name == 'gkfac':
+            args_optimizer = args_optimizer + '_' + args.mode
         log_dir = os.path.join(args.log_dir, args.dataset, args.network + args_depth, args_optimizer, lr_sched_str,
                                'bs%d_lr%.4f_mom%.2f_wd%.4f_sd%.4f_dmp%.4f_kl%.4f_TCov%d_TInv%d' %
                                (args.batch_size,
