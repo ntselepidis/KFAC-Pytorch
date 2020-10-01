@@ -7,7 +7,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', type=str, default='cifar10')
 parser.add_argument('--network', type=str, default='vgg16_bn')
 parser.add_argument('--optimizer', type=str, default='kfac')
-parser.add_argument('--machine', type=str, default='dalabgpu')
+parser.add_argument('--machine', type=str, default='leonhard')
 
 args = parser.parse_args()
 
@@ -68,22 +68,25 @@ def grid_search(args):
                    '--kl_clip %f ' \
                    '--TCov %d ' \
                    '--TInv %d %s ' \
-                   '--solver approx '
+                   '--solver approx ' \
+                   '--mode nearest ' # Only affects GKFAC
         # Parameters
-        batch_sizes = [64, 128, 256]
-        momentums = [0.0, 0.9]
+        batch_sizes = [64, 128]
+        momentums = [0.9]
         learning_rates = [1e-3, 1e-2]
         dmp = 1e-3
-        wd = 1e-4
+        wd = [0, 1e-3]
         kl_clip = 1e-3
-        TCov = 128*20
-        TInv = 128*200
-        for bs in batch_sizes:
-            tcov = int( TCov / bs )
-            tinv = int( TInv / bs )
-            for lr in learning_rates:
-                for mom in momentums:
-                    runs.append(template % (args.dataset, args_network, args.optimizer, bs, lr, mom, dmp, wd, kl_clip, tcov, tinv, flags))
+        TCov = [20, 40, 200] # update covariances 10 or 5 times before re-computing inverses
+        TInv = [200, 200, 2000]
+        for lr in learning_rates:
+            for mom in momentums:
+                for bs in batch_sizes:
+                    for i in range(len(TCov)):
+                        tcov = int( 128 * TCov[i] / bs )
+                        tinv = int( 128 * TInv[i] / bs )
+                        for j in range(len(wd)):
+                            runs.append(template % (args.dataset, args_network, args.optimizer, bs, lr, mom, dmp, wd[j], kl_clip, tcov, tinv, flags))
 
     elif args.optimizer in ['sgd', 'adam']:
         template = 'python main.py ' \
@@ -98,14 +101,15 @@ def grid_search(args):
                    '--momentum %f ' \
                    '--weight_decay %f %s '
         # Parameters
-        batch_sizes = [64, 128, 256]
-        momentums = [0.0, 0.9]
+        batch_sizes = [64]
+        momentums = [0.9]
         learning_rates = [1e-3, 1e-2]
-        wd = 1e-4
-        for bs in batch_sizes:
-            for lr in learning_rates:
-                for mom in momentums:
-                    runs.append(template % (args.dataset, args_network, args.optimizer, bs, lr, mom, wd, flags))
+        wd = [0, 1e-3]
+        for lr in learning_rates:
+            for mom in momentums:
+                for bs in batch_sizes:
+                    for j in range(len(wd)):
+                        runs.append(template % (args.dataset, args_network, args.optimizer, bs, lr, mom, wd[j], flags))
 
     return runs
 
@@ -118,7 +122,7 @@ def gen_script(args, runs):
             if args.machine == 'dalabgpu':
                 f.write('%s\n' % run)
             else:
-                f.write('bsub -W 04:00 -n 10 -R "rusage[ngpus_excl_p=1]" -R "select[gpu_model0==GeForceGTX1080Ti]" -oo $SCRATCH/KFAC_jobs/%s_%s_%s_%d.txt %s\n'
+                f.write('bsub -W 08:00 -n 10 -R "rusage[ngpus_excl_p=1]" -R "select[gpu_model0==GeForceGTX1080Ti]" -oo $SCRATCH/KFAC_jobs/%s_%s_%s_%d.txt %s\n'
                         % (args.dataset, args.network, args.optimizer, int(time.time()+cnt), run))
 
 

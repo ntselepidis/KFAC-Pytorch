@@ -181,7 +181,7 @@ class KFACOptimizer(optim.Optimizer):
                 if p.grad is None:
                     continue
                 d_p = p.grad.data
-                if weight_decay != 0 and self.steps >= 20 * self.TCov:
+                if weight_decay != 0: #and self.steps >= 20 * self.TCov:
                     d_p.add_(p.data, alpha=weight_decay)
                 if momentum != 0:
                     param_state = self.state[p]
