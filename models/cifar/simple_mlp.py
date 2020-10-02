@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import math
 
 """
-Simple MLP for cifar dataset.
+Simple MLP network.
 """
 
 class SimpleMLP(nn.Module):
@@ -14,20 +14,25 @@ class SimpleMLP(nn.Module):
             torch.manual_seed(seed)
         self.layers = nn.ModuleList()
         if n_h > 0:
+            # input layer
             self.layers.append(nn.Linear(d_in, d_h, bias=bias))
             if batch_norm:
                 self.layers.append(nn.BatchNorm1d(num_features=d_h))
             if activation is not None:
                 self.layers.append(activation)
+            # hidden layers
             for i in range(n_h):
                 self.layers.append(nn.Linear(d_h, d_h, bias=bias))
                 if batch_norm:
                     self.layers.append(nn.BatchNorm1d(num_features=d_h))
                 if activation is not None:
                     self.layers.append(activation)
+            # output layer
             self.layers.append(nn.Linear(d_h, d_out, bias=bias))
         else:
+            # single layer network
             self.layers.append(nn.Linear(d_in, d_out, bias=bias))
+        # initialize weights
         self.apply(self.init_weights)
 
     def forward(self, x):
@@ -47,7 +52,7 @@ class SimpleMLP(nn.Module):
 
 def simple_mlp(num_classes, depth, hidden_dim, **kwargs):
     """
-    Constructs a SimpleMLP model.
+    Constructs a SimpleMLP model for cifar dataset.
     """
     return SimpleMLP(d_in=3*32*32, d_out=num_classes, d_h=hidden_dim, n_h=depth, seed=0)
 
