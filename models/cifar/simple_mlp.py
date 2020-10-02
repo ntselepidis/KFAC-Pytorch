@@ -4,11 +4,11 @@ import torch.nn.functional as F
 import math
 
 """
-Simple MLP.
+Simple MLP for cifar dataset.
 """
 
 class SimpleMLP(nn.Module):
-    def __init__(self, d_in, d_out, d_h, n_h, bias=True, batch_norm=True, seed=0):
+    def __init__(self, d_in, d_out, d_h, n_h, bias=True, batch_norm=True, activation=nn.ReLU(), seed=None):
         super(SimpleMLP, self).__init__()
         if seed is not None:
             torch.manual_seed(seed)
@@ -17,19 +17,20 @@ class SimpleMLP(nn.Module):
             self.layers.append(nn.Linear(d_in, d_h, bias=bias))
             if batch_norm:
                 self.layers.append(nn.BatchNorm1d(num_features=d_h))
-            self.layers.append(nn.ReLU())
+            self.layers.append(activation)
             for i in range(n_h):
                 self.layers.append(nn.Linear(d_h, d_h, bias=bias))
                 if batch_norm:
                     self.layers.append(nn.BatchNorm1d(num_features=d_h))
-                self.layers.append(nn.ReLU())
+                if activation is not None:
+                    self.layers.append(activation)
             self.layers.append(nn.Linear(d_h, d_out, bias=bias))
         else:
             self.layers.append(nn.Linear(d_in, d_out, bias=bias))
         self.apply(self.init_weights)
 
     def forward(self, x):
-        x = x.view(-1, 3 * 32 * 32)
+        x = x.view(x.shape[0], -1)
         for layer in self.layers:
             x = layer(x)
         return x
@@ -47,7 +48,7 @@ def simple_mlp(num_classes, depth, hidden_dim, **kwargs):
     """
     Constructs a SimpleMLP model.
     """
-    return SimpleMLP(d_in=3*32*32, d_out=num_classes, d_h=hidden_dim, n_h=depth)
+    return SimpleMLP(d_in=3*32*32, d_out=num_classes, d_h=hidden_dim, n_h=depth, seed=0)
 
 if __name__ == '__main__':
     bs = 4         # Batch size
