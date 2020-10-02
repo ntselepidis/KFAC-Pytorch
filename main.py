@@ -28,6 +28,9 @@ parser.add_argument('--compressionRate', default=2, type=int)
 parser.add_argument('--widen_factor', default=1, type=int)
 parser.add_argument('--dropRate', default=0.0, type=float)
 
+# simple_mlp
+parser.add_argument('--hidden_dim', default=16*16, type=int)
+
 # General utils
 parser.add_argument('--device', default='cuda', type=str)
 parser.add_argument('--resume', '-r', action='store_true')
@@ -86,7 +89,8 @@ net = get_network(args.network,
                   growthRate=args.growthRate,
                   compressionRate=args.compressionRate,
                   widen_factor=args.widen_factor,
-                  dropRate=args.dropRate)
+                  dropRate=args.dropRate,
+                  hidden_dim=args.hidden_dim)
 net = net.to(args.device)
 
 # init dataloader

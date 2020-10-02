@@ -1,7 +1,7 @@
 from models.cifar import (alexnet, densenet, resnet, wrn,
                           vgg11, vgg11_bn, vgg13, vgg13_bn,
                           vgg16, vgg16_bn, vgg19_bn, vgg19,
-                          simple_cnn)
+                          simple_cnn, simple_mlp)
 
 def get_network(network, **kwargs):
     networks = {
@@ -17,7 +17,8 @@ def get_network(network, **kwargs):
         'vgg13_bn': vgg13_bn,
         'vgg16_bn': vgg16_bn,
         'vgg19_bn': vgg19_bn,
-        'simple_cnn': simple_cnn
+        'simple_cnn': simple_cnn,
+        'simple_mlp': simple_mlp
     }
 
     return networks[network](**kwargs)
