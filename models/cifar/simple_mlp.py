@@ -17,7 +17,8 @@ class SimpleMLP(nn.Module):
             self.layers.append(nn.Linear(d_in, d_h, bias=bias))
             if batch_norm:
                 self.layers.append(nn.BatchNorm1d(num_features=d_h))
-            self.layers.append(activation)
+            if activation is not None:
+                self.layers.append(activation)
             for i in range(n_h):
                 self.layers.append(nn.Linear(d_h, d_h, bias=bias))
                 if batch_norm:
