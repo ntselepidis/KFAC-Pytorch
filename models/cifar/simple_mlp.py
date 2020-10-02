@@ -1,35 +1,47 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import math
 
 """
 Simple MLP.
 """
 
 class SimpleMLP(nn.Module):
-    def __init__(self, d_in, d_out, d_h, n_h, bias=True, activation=nn.ReLU(), seed=None):
+    def __init__(self, d_in, d_out, d_h, n_h, bias=True, batch_norm=True, seed=0):
         super(SimpleMLP, self).__init__()
         if seed is not None:
             torch.manual_seed(seed)
-        self.activation = activation
         self.layers = nn.ModuleList()
         if n_h > 0:
             self.layers.append(nn.Linear(d_in, d_h, bias=bias))
+            if batch_norm:
+                self.layers.append(nn.BatchNorm1d(num_features=d_h))
+            self.layers.append(nn.ReLU())
             for i in range(n_h):
                 self.layers.append(nn.Linear(d_h, d_h, bias=bias))
+                if batch_norm:
+                    self.layers.append(nn.BatchNorm1d(num_features=d_h))
+                self.layers.append(nn.ReLU())
             self.layers.append(nn.Linear(d_h, d_out, bias=bias))
         else:
             self.layers.append(nn.Linear(d_in, d_out, bias=bias))
+        self.apply(self.init_weights)
 
     def forward(self, x):
         x = x.view(-1, 3 * 32 * 32)
-        if self.activation is not None:
-            for layer in self.layers[:-1]:
-                x = self.activation(layer(x))
-        else:
-            for layer in self.layers[:-1]:
-                x = layer(x)
-        return self.layers[-1](x)
+        for layer in self.layers:
+            x = layer(x)
+        return x
+
+    @staticmethod
+    def init_weights(m):
+        if type(m) == nn.Linear:
+            stdv = 1. / math.sqrt(m.weight.size(1))
+            # m.weight.data.uniform_(-stdv, stdv)
+            nn.init.kaiming_uniform_(m.weight, mode='fan_in', nonlinearity='relu')
+            if m.bias is not None:
+                m.bias.data.uniform_(-stdv, stdv)
 
 def simple_mlp(num_classes, depth, hidden_dim, **kwargs):
     """
