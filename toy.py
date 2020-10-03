@@ -98,9 +98,11 @@ def train(epoch):
     print('\nEpoch: %d' % epoch)
     net.train()
     train_loss = 0
+    correct = 0
+    total = 0
 
     desc = ('[%s][LR=%s] Loss: %.3f | Acc: %.3f%% (%d/%d)' %
-            (tag, optimizer.param_groups[0]['lr'], 0, 0, 0, 0))
+            (tag, optimizer.param_groups[0]['lr'], 0, 0, correct, total))
 
     writer.add_scalar('train/lr', optimizer.param_groups[0]['lr'], epoch)
 
@@ -123,12 +125,16 @@ def train(epoch):
         optimizer.step()
 
         train_loss += loss.item()
+        _, predicted = outputs.max(1)
+        total += targets.size(0)
+        correct += predicted.eq(targets).sum().item()
 
         desc = ('[%s][LR=%s] Loss: %.3f | Acc: %.3f%% (%d/%d)' %
-                (tag, optimizer.param_groups[0]['lr'], train_loss / (batch_idx + 1), 0, 0, 0))
+                (tag, optimizer.param_groups[0]['lr'], train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
         prog_bar.set_description(desc, refresh=True)
 
     writer.add_scalar('train/loss', train_loss/(batch_idx + 1), epoch)
+    writer.add_scalar('train/acc', 100. * correct / total, epoch)
 
 # main script
 
