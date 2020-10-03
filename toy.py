@@ -19,8 +19,8 @@ class ToyDataset(torch.utils.data.Dataset):
 
         X = torch.randn(nsamples, d_in, device=device)
 
-        net = SimpleMLP(d_in, d_out, d_h=d_in, n_h=10, bias=False,
-                batch_norm=True, activation=torch.nn.ReLU(), seed=1)
+        net = SimpleMLP(d_in, d_out, d_h=d_in, n_h=0, bias=False,
+                batch_norm=False, activation=None, seed=1)
 
         net = net.to(device)
 
@@ -28,7 +28,7 @@ class ToyDataset(torch.utils.data.Dataset):
         self.Y = net(self.X)
 
         # Considering classification instead of regression
-        self.Y = torch.argmax(torch.nn.functional.softmax(self.Y), axis=1)
+        self.Y = torch.argmax(torch.nn.functional.softmax(self.Y, dim=1), axis=1)
 
         print('Ground Truth Model')
         print(net)
@@ -146,8 +146,8 @@ args = get_args()
 
 # set main parameters
 n_samples = 2500
-d_in = 100 # 3 # Features
-d_out = 10 # 1 # Classes
+d_in = 10 # 3 # Features
+d_out = 2 # 1 # Classes
 
 # init dataset
 dataset = ToyDataset(n_samples, d_in, d_out, args.device)
@@ -157,10 +157,10 @@ trainloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, s
 
 # init model
 # d_h = 20
-n_h = 100
+n_h = args.depth
 
 net = SimpleMLP(d_in, d_out, d_h=d_in, n_h=n_h, bias=False,
-        batch_norm=True, activation=torch.nn.ReLU(), seed=0)
+        batch_norm=True, activation=None, seed=0)
 
 net = net.to(args.device)
 
