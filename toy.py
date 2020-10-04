@@ -11,36 +11,7 @@ from utils.lr_scheduler_utils import get_lr_scheduler
 from utils.log_utils import get_log_dir
 from models.cifar import SimpleMLP
 
-class ToyDataset(torch.utils.data.Dataset):
-    def __init__(self, nsamples, d_in, d_out, device):
-        super().__init__()
-
-        self.nsamples = nsamples
-
-        self.X = torch.randn(nsamples, d_in, device=device)
-
-        net = SimpleMLP(d_in, d_out, d_h=d_in, n_h=0, bias=False,
-                batch_norm=False, activation=None, seed=1)
-
-        net = net.to(device)
-
-        self.Y = net(self.X)
-
-        # Generate target labels for classification
-        if d_out == 1:
-            self.Y = torch.as_tensor(torch.sigmoid(self.Y) > 0.5, dtype=torch.float32)#.squeeze()
-        else:
-            self.Y = torch.argmax(torch.nn.functional.softmax(self.Y, dim=1), axis=1)
-
-        print('Ground Truth Model')
-        print(net)
-
-    def __len__(self):
-        return self.nsamples
-
-    def __getitem__(self, idx):
-        return self.X[idx], self.Y[idx]
-
+# Gets command-line arguments
 def get_args():
     # fetch args
     parser = argparse.ArgumentParser()
@@ -61,7 +32,7 @@ def get_args():
     parser.add_argument('--epoch', default=100, type=int)
 
     # Learning rate scheduler (ReduceLROnPlateau, MultiStepLR)
-    parser.add_argument('--lr_sched', default='multistep', type=str, choices=['multistep'])
+    parser.add_argument('--lr_sched', default='plateau', type=str, choices=['plateau', 'multistep'])
     # ReduceLROnPlateau params
     parser.add_argument('--lr_sched_factor', default=0.1, type=float)
     parser.add_argument('--lr_sched_patience', default=10, type=int)
@@ -95,6 +66,39 @@ def get_args():
     args = parser.parse_args()
 
     return args
+
+# Wraps custom dataset inside torch class for use in dataloader
+class CustomDataset(torch.utils.data.Dataset):
+    def __init__(self, X, Y):
+        super().__init__()
+        self.X = X
+        self.Y = Y
+
+    def __len__(self):
+        return self.X.shape[0]
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.Y[idx]
+
+# Generates data from a ground truth model
+def generate_data(n_samples, d_in, d_out):
+    # init ground truth model
+    net = SimpleMLP(d_in, d_out, d_h=d_in, n_h=0, bias=False,
+            batch_norm=False, activation=None, seed=1)
+
+    net = net.to(args.device)
+
+    # generate dataset using ground truth model
+    X = torch.randn(n_samples, d_in, device=args.device)
+    Y = net(X)
+
+    # generate target labels for classification
+    if d_out == 1:
+        Y = torch.as_tensor(torch.sigmoid(Y) > 0.5, dtype=torch.float32)#.squeeze()
+    else:
+        Y = torch.argmax(torch.nn.functional.softmax(Y, dim=1), axis=1)
+
+    return X, Y
 
 def train(epoch):
     print('\nEpoch: %d' % epoch)
@@ -153,8 +157,45 @@ def train(epoch):
     writer.add_scalar('train/loss', train_loss/(batch_idx + 1), epoch)
     writer.add_scalar('train/acc', 100. * correct / total, epoch)
 
-# main script
+def test(epoch):
+    net.eval()
+    test_loss = 0
+    correct = 0
+    total = 0
+    desc = ('[%s][LR=%s] Loss: %.3f | Acc: %.3f%% (%d/%d)'
+            % (tag, optimizer.param_groups[0]['lr'], test_loss/(0+1), 0, correct, total))
 
+    prog_bar = tqdm(enumerate(testloader), total=len(testloader), desc=desc, leave=True)
+    with torch.no_grad():
+        for batch_idx, (inputs, targets) in prog_bar:
+            inputs, targets = inputs.to(args.device), targets.to(args.device)
+            outputs = net(inputs)
+            loss = criterion(outputs, targets)
+
+            test_loss += loss.item()
+            if d_out == 1:
+                predicted = torch.as_tensor(torch.sigmoid(outputs) > 0.5, dtype=torch.float32)
+            else:
+                _, predicted = outputs.max(1)
+            total += targets.size(0)
+            correct += predicted.eq(targets).sum().item()
+
+            desc = ('[%s][LR=%s] Loss: %.3f | Acc: %.3f%% (%d/%d)'
+                    % (tag, optimizer.param_groups[0]['lr'], test_loss / (batch_idx + 1), 100. * correct / total, correct, total))
+            prog_bar.set_description(desc, refresh=True)
+
+    # Save checkpoint.
+    test_loss = test_loss / (batch_idx + 1)
+    acc = 100. * correct / total
+
+    writer.add_scalar('test/loss', test_loss, epoch)
+    writer.add_scalar('test/acc', acc, epoch)
+
+    return test_loss
+
+#
+# main script
+#
 # set random seed for reproducibility
 torch.manual_seed(0)
 
@@ -162,27 +203,28 @@ torch.manual_seed(0)
 args = get_args()
 
 # set main parameters
-n_samples = 2500
+n_train = 25000
+n_test = n_train // 10
+n_samples = n_train + n_test
 d_in = 10 # Features
 d_out = 1 # Classes (for binary classification d_out can be either 1 or 2)
 
-# init dataset
-dataset = ToyDataset(n_samples, d_in, d_out, args.device)
+# generate data from ground truth model
+X, Y = generate_data(n_samples, d_in, d_out)
 
-# init data loader
-trainloader = torch.utils.data.DataLoader(dataset, batch_size=args.batch_size, shuffle=True)
+# init trainset and testset
+trainset = CustomDataset(X[:n_train], Y[:n_train])
+testset  = CustomDataset(X[n_train:], Y[n_train:])
 
-# init model
-# d_h = 20
-n_h = args.depth
+# init data loaders
+trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True)
+testloader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, shuffle=False)
 
-net = SimpleMLP(d_in, d_out, d_h=d_in, n_h=n_h, bias=False,
+# init approximate model
+net = SimpleMLP(d_in, d_out, d_h=d_in, n_h=args.depth, bias=False,
         batch_norm=True, activation=None, seed=0)
 
 net = net.to(args.device)
-
-print('Approximate Model')
-print(net)
 
 # init optimizer
 optim_name = args.optimizer.lower()
@@ -206,8 +248,13 @@ if not os.path.isdir(log_dir):
     os.makedirs(log_dir)
 writer = SummaryWriter(log_dir)
 
-# start training
-for epoch in range(args.epoch):
-    train(epoch)
-    lr_scheduler.step()
+if __name__ == '__main__':
+    # start training
+    for epoch in range(args.epoch):
+        train(epoch)
+        test_loss = test(epoch)
+        if args.lr_sched == 'plateau':
+            lr_scheduler.step(test_loss)
+        else:
+            lr_scheduler.step()
 
