@@ -17,6 +17,8 @@ def get_args():
 
     # simple_mlp
     parser.add_argument('--hidden_dim', default=16*16, type=int)
+    parser.add_argument('--activation', default=None, type=str,
+            choices=['relu', 'sigmoid', 'tanh'])
 
     # General utils
     parser.add_argument('--device', default='cuda', type=str)

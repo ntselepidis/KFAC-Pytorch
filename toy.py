@@ -165,9 +165,18 @@ testset  = CustomDataset(X[n_train:], Y[n_train:])
 trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True)
 testloader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size, shuffle=False)
 
+# choose activation fuction for approximate model
+act_dict = {
+        'relu': torch.nn.ReLU(),
+        'sigmoid': torch.nn.Sigmoid(),
+        'tanh': torch.nn.Tanh()
+}
+
+act = None if args.activation is None else act_dict[args.activation]
+
 # init approximate model
 net = SimpleMLP(d_in, d_out, d_h=d_in, n_h=args.depth, bias=False,
-        batch_norm=True, activation=None, seed=0)
+        batch_norm=True, activation=act, seed=0)
 
 net = net.to(args.device)
 
