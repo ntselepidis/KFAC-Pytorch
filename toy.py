@@ -17,18 +17,20 @@ class ToyDataset(torch.utils.data.Dataset):
 
         self.nsamples = nsamples
 
-        X = torch.randn(nsamples, d_in, device=device)
+        self.X = torch.randn(nsamples, d_in, device=device)
 
         net = SimpleMLP(d_in, d_out, d_h=d_in, n_h=0, bias=False,
                 batch_norm=False, activation=None, seed=1)
 
         net = net.to(device)
 
-        self.X = X
         self.Y = net(self.X)
 
-        # Considering classification instead of regression
-        self.Y = torch.argmax(torch.nn.functional.softmax(self.Y, dim=1), axis=1)
+        # Generate target labels for classification
+        if d_out == 1:
+            self.Y = torch.as_tensor(torch.nn.functional.sigmoid(self.Y) > 0.5, dtype=torch.float32)#.squeeze()
+        else:
+            self.Y = torch.argmax(torch.nn.functional.softmax(self.Y, dim=1), axis=1)
 
         print('Ground Truth Model')
         print(net)
@@ -125,7 +127,10 @@ def train(epoch):
                 # In our case, k = outputs.shape[1] = d_out and n = 1.
                 # torch.multinomial() returns the index of each side, which in our case
                 # is the class target label of the sample.
-                sampled_targets = torch.multinomial(torch.nn.functional.softmax(outputs, dim=1), 1).squeeze()
+                if d_out == 1:
+                    sampled_targets = torch.bernoulli(torch.nn.functional.sigmoid(outputs))
+                else:
+                    sampled_targets = torch.multinomial(torch.nn.functional.softmax(outputs, dim=1), 1).squeeze()
             loss_sample = criterion(outputs, sampled_targets)
             loss_sample.backward(retain_graph=True)
             optimizer.acc_stats = False
@@ -134,7 +139,10 @@ def train(epoch):
         optimizer.step()
 
         train_loss += loss.item()
-        _, predicted = outputs.max(1)
+        if d_out == 1:
+            predicted = torch.as_tensor(torch.nn.functional.sigmoid(outputs) > 0.5, dtype=torch.float32)
+        else:
+            _, predicted = outputs.max(1)
         total += targets.size(0)
         correct += predicted.eq(targets).sum().item()
 
@@ -155,8 +163,8 @@ args = get_args()
 
 # set main parameters
 n_samples = 2500
-d_in = 10 # 3 # Features
-d_out = 2 # 1 # Classes
+d_in = 10 # Features
+d_out = 1 # Classes (for binary classification d_out can be either 1 or 2)
 
 # init dataset
 dataset = ToyDataset(n_samples, d_in, d_out, args.device)
@@ -186,7 +194,10 @@ lr_scheduler = get_lr_scheduler(optimizer, args)
 
 # init criterion
 # criterion = torch.nn.MSELoss() # Regression
-criterion = torch.nn.CrossEntropyLoss() # Classification
+if d_out == 1:
+    criterion = torch.nn.BCEWithLogitsLoss() # Binary classification
+else:
+    criterion = torch.nn.CrossEntropyLoss() # Multi-class classification
 
 # init summary writter
 log_dir = get_log_dir(optim_name, args)
