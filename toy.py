@@ -113,14 +113,23 @@ def train(epoch):
         outputs = net(inputs)
         loss = criterion(outputs, targets)
         if optim_name in ['kfac', 'ekfac', 'gkfac'] and optimizer.steps % optimizer.TCov == 0:
-            # compute true fisher
+            # compute true Fisher
             optimizer.acc_stats = True
             with torch.no_grad():
-                sampled_y = torch.multinomial(torch.nn.functional.softmax(outputs, dim=1), 1).squeeze()
-            loss_sample = criterion(outputs, sampled_y)
+                # Perform one random experiment per output sample (row) in the batch, i.e.
+                # draw one sample (without replacement) from the multinomial distribution,
+                # given the row-wise softmax(output) as weights.
+                # These weights represent the probability of each outcome.
+                # Note: ``The multinomial distribution models the probability of counts
+                # for each side of a k-sided dice rolled n times.``
+                # In our case, k = outputs.shape[1] = d_out and n = 1.
+                # torch.multinomial() returns the index of each side, which in our case
+                # is the class target label of the sample.
+                sampled_targets = torch.multinomial(torch.nn.functional.softmax(outputs, dim=1), 1).squeeze()
+            loss_sample = criterion(outputs, sampled_targets)
             loss_sample.backward(retain_graph=True)
             optimizer.acc_stats = False
-            optimizer.zero_grad()  # clear the gradient for computing true-fisher.
+            optimizer.zero_grad()  # clear the gradient for computing true Fisher.
         loss.backward()
         optimizer.step()
 
