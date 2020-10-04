@@ -28,7 +28,7 @@ class ToyDataset(torch.utils.data.Dataset):
 
         # Generate target labels for classification
         if d_out == 1:
-            self.Y = torch.as_tensor(torch.nn.functional.sigmoid(self.Y) > 0.5, dtype=torch.float32)#.squeeze()
+            self.Y = torch.as_tensor(torch.sigmoid(self.Y) > 0.5, dtype=torch.float32)#.squeeze()
         else:
             self.Y = torch.argmax(torch.nn.functional.softmax(self.Y, dim=1), axis=1)
 
@@ -128,7 +128,7 @@ def train(epoch):
                 # torch.multinomial() returns the index of each side, which in our case
                 # is the class target label of the sample.
                 if d_out == 1:
-                    sampled_targets = torch.bernoulli(torch.nn.functional.sigmoid(outputs))
+                    sampled_targets = torch.bernoulli(torch.sigmoid(outputs))
                 else:
                     sampled_targets = torch.multinomial(torch.nn.functional.softmax(outputs, dim=1), 1).squeeze()
             loss_sample = criterion(outputs, sampled_targets)
@@ -140,7 +140,7 @@ def train(epoch):
 
         train_loss += loss.item()
         if d_out == 1:
-            predicted = torch.as_tensor(torch.nn.functional.sigmoid(outputs) > 0.5, dtype=torch.float32)
+            predicted = torch.as_tensor(torch.sigmoid(outputs) > 0.5, dtype=torch.float32)
         else:
             _, predicted = outputs.max(1)
         total += targets.size(0)
