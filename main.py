@@ -197,7 +197,7 @@ def test(epoch):
             prog_bar.set_description(desc, refresh=True)
 
     # Save checkpoint.
-    test_loss / (batch_idx + 1)
+    test_loss = test_loss / (batch_idx + 1)
     acc = 100. * correct / total
 
     writer.add_scalar('test/loss', test_loss, epoch)
