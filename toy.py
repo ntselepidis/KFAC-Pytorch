@@ -37,7 +37,7 @@ def generate_data(n_samples, d_in, d_out):
 
     # generate target labels for classification
     if d_out == 1:
-        Y = torch.as_tensor(torch.sigmoid(Y) > 0.5, dtype=torch.float32)#.squeeze()
+        Y = torch.as_tensor(torch.sigmoid(Y) > 0.5, dtype=torch.float32, device=args.device)#.squeeze()
     else:
         Y = torch.argmax(torch.nn.functional.softmax(Y, dim=1), axis=1)
 
@@ -87,7 +87,7 @@ def train(epoch):
 
         train_loss += loss.item()
         if d_out == 1:
-            predicted = torch.as_tensor(torch.sigmoid(outputs) > 0.5, dtype=torch.float32)
+            predicted = torch.as_tensor(torch.sigmoid(outputs) > 0.5, dtype=torch.float32, device=args.device)
         else:
             _, predicted = outputs.max(1)
         total += targets.size(0)
@@ -117,7 +117,7 @@ def test(epoch):
 
             test_loss += loss.item()
             if d_out == 1:
-                predicted = torch.as_tensor(torch.sigmoid(outputs) > 0.5, dtype=torch.float32)
+                predicted = torch.as_tensor(torch.sigmoid(outputs) > 0.5, dtype=torch.float32, device=args.device)
             else:
                 _, predicted = outputs.max(1)
             total += targets.size(0)
