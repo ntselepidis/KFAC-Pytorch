@@ -1,6 +1,10 @@
 import os
 
 def get_log_dir(optim_name, args):
+    # Network structure
+    act = ""
+    if args.network == 'simple_mlp' and args.activation is not None:
+        act = "_" + args.activation
     # Network depth
     args_depth = "" if args.depth == 0 else str(args.depth)
     # LR scheduler
@@ -16,7 +20,7 @@ def get_log_dir(optim_name, args):
         raise NotImplementedError
     # Logging based on chosen optimizer
     if optim_name == 'sgd' or optim_name == 'adam':
-        log_dir = os.path.join(args.log_dir, args.dataset, args.network + args_depth, args.optimizer, lr_sched_str,
+        log_dir = os.path.join(args.log_dir, args.dataset, args.network + args_depth + act, args.optimizer, lr_sched_str,
                                'bs%d_lr%.4f_mom%.2f_wd%.4f' %
                                (args.batch_size,
                                 args.learning_rate,
@@ -29,7 +33,7 @@ def get_log_dir(optim_name, args):
         args_optimizer = args_optimizer + '_' + args.solver
         if optim_name == 'gkfac':
             args_optimizer = args_optimizer + '_' + args.mode
-        log_dir = os.path.join(args.log_dir, args.dataset, args.network + args_depth, args_optimizer, lr_sched_str,
+        log_dir = os.path.join(args.log_dir, args.dataset, args.network + args_depth + act, args_optimizer, lr_sched_str,
                                'bs%d_lr%.4f_mom%.2f_wd%.4f_sd%.4f_dmp%.4f_kl%.4f_TCov%d_TInv%d' %
                                (args.batch_size,
                                 args.learning_rate,
@@ -41,7 +45,7 @@ def get_log_dir(optim_name, args):
                                 args.TCov,
                                 args.TInv))
     elif optim_name == 'ekfac':
-        log_dir = os.path.join(args.log_dir, args.dataset, args.network + args_depth, args.optimizer, lr_sched_str,
+        log_dir = os.path.join(args.log_dir, args.dataset, args.network + args_depth + act, args.optimizer, lr_sched_str,
                                'bs%d_lr%.4f_mom%.2f_wd%.4f_sd%.4f_dmp%.4f_kl%.4f_TCov%d_TInv%d_TScal%d' %
                                (args.batch_size,
                                 args.learning_rate,
