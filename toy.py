@@ -27,7 +27,7 @@ class CustomDataset(torch.utils.data.Dataset):
 def generate_data(n_samples, d_in, d_out):
     # init ground truth model
     net = SimpleMLP(d_in, d_out, d_h=d_in, n_h=0, bias=False,
-            batch_norm=False, activation=None, seed=1)
+            batch_norm=False, activation=None, seed=args.seed+1)
 
     net = net.to(args.device)
 
@@ -139,13 +139,13 @@ def test(epoch):
 #
 # main script
 #
-# set random seed for reproducibility
-torch.manual_seed(0)
-
 # get command-line arguments
 args = get_args()
 args.network = 'simple_mlp'
 args.dataset = 'toy'
+
+# set random seed for reproducibility
+torch.manual_seed(args.seed)
 
 # set main parameters
 n_train = 25000
@@ -176,7 +176,7 @@ act = None if args.activation is None else act_dict[args.activation]
 
 # init approximate model
 net = SimpleMLP(d_in, d_out, d_h=d_in, n_h=args.depth, bias=False,
-        batch_norm=True, activation=act, seed=0)
+        batch_norm=True, activation=act, seed=args.seed)
 
 net = net.to(args.device)
 

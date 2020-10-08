@@ -16,6 +16,7 @@ def get_args():
     parser.add_argument('--dropRate', default=0.0, type=float)
 
     # simple_mlp
+    parser.add_argument('--seed', default=0, type=int)
     parser.add_argument('--hidden_dim', default=16*16, type=int)
     parser.add_argument('--activation', default=None, type=str,
             choices=['relu', 'sigmoid', 'tanh'])
