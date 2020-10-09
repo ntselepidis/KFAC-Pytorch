@@ -2,9 +2,7 @@ import os
 
 def get_log_dir(optim_name, args):
     # Network structure
-    seed = ""
-    if args.network == 'simple_mlp':
-        seed = "_" + str(args.seed)
+    seed = "_" + str(args.seed)
     act = ""
     if args.network == 'simple_mlp' and args.activation is not None:
         act = "_" + args.activation
