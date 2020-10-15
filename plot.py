@@ -91,8 +91,8 @@ def main():
 
     scalar_dict = {"train/loss": "Training Loss",
                    "train/acc": "Training Accuracy",
-                   "test/loss": "Validation Loss",
-                   "test/acc": "Validation Accuracy"}
+                   "test/loss": "Test Loss",
+                   "test/acc": "Test Accuracy"}
  
     # create output directory
     directory = create_output_directory(args)
@@ -107,22 +107,25 @@ def main():
         ax = fig.add_subplot(111)
         sns.lineplot(data=df, x='epochs', y=scalar, hue='optimizer')
         if args.title is not None:
-            plt.title(args.title)
+            plt.title(f"{args.title}: {scalar_dict[scalar]}", fontsize=17)
         else:
-            plt.title(f"{scalar_dict[scalar]} vs Epochs")
-        plt.xlabel("Epochs")
-        h = plt.ylabel(scalar_dict[scalar])
+            plt.title(f"{scalar_dict[scalar]}", fontsize=17)
+        plt.xlabel("Epochs", fontsize=15)
+        plt.ylabel("")
+        # h = plt.ylabel(scalar_dict[scalar])
         # h.set_rotation(0)
         if "Accuracy" in scalar_dict[scalar]:
-            plt.legend(loc="lower right")
+            plt.legend(loc="lower right", fontsize=15)
         else:
             if args.logscale:
                 ax.set_yscale('log')
-            plt.legend(loc="upper right")
+            plt.legend(loc="upper right", fontsize=15)
+        ax.xaxis.set_tick_params(labelsize=12.5)
+        ax.yaxis.set_tick_params(labelsize=12.5)
 
         # plt.show()
         # save figure
-        plt.savefig(f"{directory}/{scalar.replace('/','_')}.png", dpi=300)
+        plt.savefig(f"{directory}/{scalar.replace('/','_')}.pdf")
 
 if __name__ == '__main__':
     main()
