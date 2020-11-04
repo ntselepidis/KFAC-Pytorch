@@ -48,6 +48,18 @@ and for E-KFAC:
 }
 ```
 
+For two-level K-FAC please cite:
+```
+@misc{tselepidis2020twolevel,
+  title={Two-Level K-FAC Preconditioning for Deep Learning},
+  author={Nikolaos Tselepidis and Jonas Kohler and Antonio Orvieto},
+  year={2020},
+  eprint={2011.00573},
+  archivePrefix={arXiv},
+  primaryClass={cs.LG}
+}
+```
+
 ## Contact
 
 If you have any questions or suggestions, please feel free to contact me via email at ntselepidis@student.ethz.ch.
