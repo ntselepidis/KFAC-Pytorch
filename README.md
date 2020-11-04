@@ -3,7 +3,7 @@
 This repository contains a Pytorch implementation of K-FAC, along with certain variants, i.e.:
 * One-Level K-FAC (see [`optimizers/kfac.py`](optimizers/kfac.py) and [paper](https://arxiv.org/abs/1503.05671))
 * One-Level E-KFAC (see [`optimizers/ekfac.py`](optimizers/ekfac.py) and [paper](https://arxiv.org/abs/1806.03884))
-* Two-Level K-FAC (see [`optimizers/gkfac.py`](optimizers/gkfac.py))
+* Two-Level K-FAC (see [`optimizers/gkfac.py`](optimizers/gkfac.py) and [paper](https://arxiv.org/abs/2011.00573))
 
 **Note:** The current implementations support only single-GPU training.
 
