@@ -63,9 +63,9 @@ def load_data(args):
                     continue
                 times, epochs, values = zip(*event_acc.Scalars(scalar))
                 if (i == 1):
-                    data['times'] = np.asarray(times)
-                    data['epochs'] = np.asarray(epochs)
-                data[scalar] = np.asarray(values)
+                    data['times'] = np.asarray(times)[:args.stop]
+                    data['epochs'] = np.asarray(epochs)[:args.stop]
+                data[scalar] = np.asarray(values)[:args.stop]
             if run[optimizer] == 1:
                 df = pd.DataFrame(data)
                 df_list[ind[optimizer]] = df
