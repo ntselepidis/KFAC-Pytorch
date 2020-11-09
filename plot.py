@@ -38,14 +38,14 @@ def get_optimizer(optimizer):
     elif "sgd" in optimizer:
         optimizer = "SGD"
     elif "adam" in optimizer:
-        optimizer = "ADAM"
+        optimizer = "Adam"
     else:
         pass
     return optimizer
 
 def load_data(args):
-    run = {"SGD": 0, "ADAM": 0, "K-FAC (one-level)": 0, "K-FAC (two-level)": 0}
-    ind = {"SGD": 0, "ADAM": 1, "K-FAC (one-level)": 2, "K-FAC (two-level)": 3}
+    run = {"SGD": 0, "Adam": 0, "K-FAC (one-level)": 0, "K-FAC (two-level)": 0}
+    ind = {"SGD": 0, "Adam": 1, "K-FAC (one-level)": 2, "K-FAC (two-level)": 3}
     df_list = [[] for _ in range(len(run))]
     for root, _, files in os.walk(args.logdir):
         for file in files:
@@ -87,7 +87,7 @@ def main():
     print('Data Loaded')
 
     # utilities
-    optimizer_list = ["SGD", "ADAM", "K-FAC (one-level)", "K-FAC (two-level)"]
+    optimizer_list = ["SGD", "Adam", "K-FAC (one-level)", "K-FAC (two-level)"]
 
     scalar_dict = {"train/loss": "Training Loss",
                    "train/acc": "Training Accuracy",
