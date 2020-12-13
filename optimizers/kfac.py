@@ -212,4 +212,4 @@ class KFACOptimizer(optim.Optimizer):
 
         self._step(closure)
         self.steps += 1
-        self.stat_decay = min( 1.0 - 1.0 / (self.steps + 1), 0.95 )
+        self.stat_decay = min( 1.0 - 1.0 / (self.steps // self.TCov + 1), 0.95 )

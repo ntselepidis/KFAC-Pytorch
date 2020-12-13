@@ -1,5 +1,4 @@
 torch
 torchvision
 tensorboardX
-tensorflow
 tqdm
