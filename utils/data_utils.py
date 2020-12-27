@@ -32,6 +32,17 @@ def get_transforms(dataset):
             transforms.Normalize((0.5071, 0.4867, 0.4408), (0.2675, 0.2565, 0.2761)),
         ])
 
+    if dataset == 'mnist':
+        transform_train = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Lambda(lambda x: torch.flatten(x))
+        ])
+
+        transform_test = transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Lambda(lambda x: torch.flatten(x))
+        ])
+
     assert transform_test is not None and transform_train is not None, 'Error, no dataset %s' % dataset
     return transform_train, transform_test
 
@@ -46,6 +57,10 @@ def get_dataloader(dataset, train_batch_size, test_batch_size, num_workers=2, ro
     if dataset == 'cifar100':
         trainset = torchvision.datasets.CIFAR100(root=root, train=True, download=True, transform=transform_train)
         testset = torchvision.datasets.CIFAR100(root=root, train=False, download=True, transform=transform_test)
+
+    if dataset == 'mnist':
+        trainset = torchvision.datasets.MNIST(root=root, train=True, download=True, transform=transform_train)
+        testset = torchvision.datasets.MNIST(root=root, train=False, download=True, transform=transform_test)
 
 
     assert trainset is not None and testset is not None, 'Error, no dataset %s' % dataset

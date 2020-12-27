@@ -7,13 +7,14 @@ This repository contains a Pytorch implementation of K-FAC, along with certain v
 
 **Note:** The current implementations support only single-GPU training.
 
-Two main scripts are provided, i.e.:
-* [`main.py`](main.py): Benchmarks optimizers on training different networks on Cifar10 and Cifar100 datasets.
-* [`toy.py`](toy.py): Benchmarks optimizers on training linear and non-linear MLPs on Gaussian data with planted targets.
+The main scripts provided are the following:
+* [`train_cifar.py`](train_cifar.py): Benchmarks optimizers on training different networks on CIFAR10 and CIFAR100 datasets.
+* [`train_mnist.py`](train_mnist.py): Benchmarks optimizers on training a deep autoencoder network on MNIST dataset.
+* [`train_toy.py`](train_toy.py): Benchmarks optimizers on training linear and non-linear MLPs on Gaussian data with planted targets.
 
 For details on the command-line arguments check the file [`utils/get_args.py`](utils/get_args.py).
 
-To perform grid-search use the script [`trainer.py`](trainer.py).
+To perform grid-search use the script [`grid_search.py`](grid_search.py).
 
 ## References
 
