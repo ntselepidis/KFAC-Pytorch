@@ -45,7 +45,7 @@ def train(epoch):
         inputs = inputs.to(args.device)
         optimizer.zero_grad()
         outputs = net(inputs)
-        loss = criterion(outputs, inputs) # TODO(nikolas): Check
+        loss = criterion(outputs, inputs)
         if optim_name in ['kfac', 'ekfac', 'gkfac'] and optimizer.steps % optimizer.TCov == 0:
             # compute true Fisher
             optimizer.acc_stats = True
@@ -76,7 +76,7 @@ def test(epoch):
         for batch_idx, (inputs, _) in prog_bar:
             inputs = inputs.to(args.device)
             outputs = net(inputs)
-            loss = criterion(outputs, inputs) # TODO(nikolas): Check
+            loss = criterion(outputs, inputs)
 
             test_loss += loss.item()
             desc = ('[%s][LR=%s] Loss: %.3f'
@@ -104,9 +104,24 @@ args.dataset = 'mnist'
 # set random seed for reproducibility
 torch.manual_seed(args.seed)
 
+# choose activation fuction for model
+act_dict = {
+        'relu': torch.nn.ReLU(),
+        'sigmoid': torch.nn.Sigmoid(),
+        'tanh': torch.nn.Tanh()
+}
+
+act = nn.Sigmoid() if args.activation is None else act_dict[args.activation]
+
 # init model
-net = deep_autoencoder()
-net = net.to(args.device)
+encoder_sizes = [28 * 28, 1000, 500, 250, 30]
+decoder_sizes = [30, 250, 500, 1000, 28 * 28]
+
+net = deep_autoencoder(
+        encoder_sizes=encoder_sizes,
+        decoder_sizes=decoder_sizes,
+        activation=act
+    ).to(args.device)
 
 # init dataloader
 trainloader, testloader = get_dataloader(dataset=args.dataset,
