@@ -111,7 +111,7 @@ act_dict = {
         'tanh': torch.nn.Tanh()
 }
 
-act = nn.Sigmoid() if args.activation is None else act_dict[args.activation]
+act = torch.nn.Sigmoid() if args.activation is None else act_dict[args.activation]
 
 # init model
 encoder_sizes = [28 * 28, 1000, 500, 250, 30]
@@ -140,7 +140,6 @@ criterion = torch.nn.BCEWithLogitsLoss()
 
 # init summary writter
 log_dir = get_log_dir(optim_name, args)
-
 if not os.path.isdir(log_dir):
     os.makedirs(log_dir)
 writer = SummaryWriter(log_dir)
@@ -150,13 +149,11 @@ visualization_dir = f"visuals/mnist/{optim_name}"
 if not os.path.isdir(visualization_dir):
     os.makedirs(visualization_dir)
 
-if __name__ == '__main__':
-    # start training
-    for epoch in range(args.epoch):
-        train(epoch)
-        test_loss = test(epoch)
-        if args.lr_sched == 'plateau':
-            lr_scheduler.step(test_loss)
-        else:
-            lr_scheduler.step()
-
+# start training
+for epoch in range(args.epoch):
+    train(epoch)
+    test_loss = test(epoch)
+    if args.lr_sched == 'plateau':
+        lr_scheduler.step(test_loss)
+    else:
+        lr_scheduler.step()

@@ -1,4 +1,4 @@
-'''Train toy dataset with PyTorch.'''
+'''Train a simple MLP on a toy dataset with PyTorch.'''
 import os
 import torch
 
@@ -97,7 +97,7 @@ def train(epoch):
                 (tag, optimizer.param_groups[0]['lr'], train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
         prog_bar.set_description(desc, refresh=True)
 
-    writer.add_scalar('train/loss', train_loss/(batch_idx + 1), epoch)
+    writer.add_scalar('train/loss', train_loss / (batch_idx + 1), epoch)
     writer.add_scalar('train/acc', 100. * correct / total, epoch)
 
 def test(epoch):
@@ -197,18 +197,15 @@ else:
 
 # init summary writter
 log_dir = get_log_dir(optim_name, args)
-
 if not os.path.isdir(log_dir):
     os.makedirs(log_dir)
 writer = SummaryWriter(log_dir)
 
-if __name__ == '__main__':
-    # start training
-    for epoch in range(args.epoch):
-        train(epoch)
-        test_loss = test(epoch)
-        if args.lr_sched == 'plateau':
-            lr_scheduler.step(test_loss)
-        else:
-            lr_scheduler.step()
-
+# start training
+for epoch in range(args.epoch):
+    train(epoch)
+    test_loss = test(epoch)
+    if args.lr_sched == 'plateau':
+        lr_scheduler.step(test_loss)
+    else:
+        lr_scheduler.step()
