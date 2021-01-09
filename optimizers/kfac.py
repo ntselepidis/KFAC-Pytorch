@@ -103,9 +103,12 @@ class KFACOptimizer(optim.Optimizer):
         else:
             group = self.param_groups[0]
             damping = group['damping']
-            numer = torch.trace(self.m_aa[m]) / (self.m_aa[m].shape[0] + 1)
-            denom = torch.trace(self.m_gg[m]) / (self.m_gg[m].shape[0])
+            numer = torch.trace(self.m_aa[m]) * self.m_gg[m].shape[0]
+            denom = torch.trace(self.m_gg[m]) * self.m_aa[m].shape[0]
             pi = numer / denom
+            assert numer > 0, "trace(A) should be positive"
+            assert denom > 0, "trace(G) should be positive"
+            # assert pi > 0, "pi should be positive"
             I_a = torch.eye(self.m_aa[m].shape[0], device=self.m_aa[m].device)
             I_g = torch.eye(self.m_gg[m].shape[0], device=self.m_gg[m].device)
             self.Inv_a[m] = torch.inverse(self.m_aa[m] + math.sqrt(damping * pi) * I_a)

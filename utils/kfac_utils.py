@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+# TODO(nikolas): sum(kron(A, B)) = sum(A) * sum(B) [EFFICIENCY]
 def sum_kron(A, G):
     A_rows, A_cols = A.size()
     G_rows, G_cols = G.size()
@@ -110,6 +111,7 @@ class ComputeCovA:
 
         return (cov_a, a)
 
+    # TODO(nikolas): Check scaling using spatial_size from KFC paper [CORRECTNESS]
     @staticmethod
     def conv2d(a, layer):
         batch_size = a.size(0)
@@ -155,6 +157,8 @@ class ComputeCovG:
 
         return (cov_g, g)
 
+    # TODO(nikolas): Check scaling using spatial_size from KFC paper [CORRECTNESS]
+    # TODO(nikolas): Check batch_averaged [CORRECTNESS]
     @staticmethod
     def conv2d(g, layer, batch_averaged):
         # g: batch_size * n_filters * out_h * out_w
@@ -172,6 +176,7 @@ class ComputeCovG:
 
         return (cov_g, g)
 
+    # TODO(nikolas): Check batch_averaged [CORRECTNESS]
     @staticmethod
     def linear(g, layer, batch_averaged):
         # g: batch_size * out_dim

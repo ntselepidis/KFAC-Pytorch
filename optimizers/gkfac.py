@@ -162,8 +162,8 @@ class GKFACOptimizer(optim.Optimizer):
         else:
             group = self.param_groups[0]
             damping = group['damping']
-            numer = torch.trace(self.m_aa[m]) / (self.m_aa[m].shape[0] + 1)
-            denom = torch.trace(self.m_gg[m]) / (self.m_gg[m].shape[0])
+            numer = torch.trace(self.m_aa[m]) * self.m_gg[m].shape[0]
+            denom = torch.trace(self.m_gg[m]) * self.m_aa[m].shape[0]
             pi = numer / denom
             assert numer > 0, "trace(A) should be positive"
             assert denom > 0, "trace(G) should be positive"
