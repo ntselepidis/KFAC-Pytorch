@@ -38,7 +38,8 @@ def get_optimizer(optim_name, net, args):
                                    solver=args.solver,
                                    omega_1=args.omega_1,
                                    omega_2=args.omega_2,
-                                   mode=args.mode)
+                                   mode=args.mode,
+                                   device=args.device)
     elif optim_name == 'ekfac':
         optimizer = EKFACOptimizer(net,
                                    lr=args.learning_rate,

@@ -5,7 +5,6 @@ import torch.optim as optim
 
 from utils.kfac_utils import (ComputeCovA, ComputeCovG)
 from utils.kfac_utils import update_running_stat
-from utils.kfac_utils import sum_kron
 
 
 class GKFACOptimizer(optim.Optimizer):
@@ -23,7 +22,8 @@ class GKFACOptimizer(optim.Optimizer):
                  solver='symeig',
                  omega_1=1.0,
                  omega_2=1.0,
-                 mode='nearest'):
+                 mode='nearest',
+                 device='cuda'):
         if lr < 0.0:
             raise ValueError("Invalid learning rate: {}".format(lr))
         if momentum < 0.0:
@@ -34,18 +34,20 @@ class GKFACOptimizer(optim.Optimizer):
                         weight_decay=weight_decay)
         # TODO (CW): GKFAC optimizer now only support model as input
         super(GKFACOptimizer, self).__init__(model.parameters(), defaults)
+
+        self.model = model
+        self.known_modules = {'Linear', 'Conv2d'}
+        self.modules = []
+        self._register_modules()
+
+        # utility vars
         self.CovAHandler = ComputeCovA()
         self.CovGHandler = ComputeCovG()
         self.batch_averaged = batch_averaged
-
-        self.known_modules = {'Linear', 'Conv2d'}
-
-        self.modules = []
-        self.grad_outputs = {}
-
-        self.model = model
-        self._prepare_model()
-
+        self.stat_decay = 0 # stat_decay
+        self.kl_clip = kl_clip
+        self.TCov = TCov
+        self.TInv = TInv
         self.steps = 0
 
         # one-level KFAC vars
@@ -54,7 +56,6 @@ class GKFACOptimizer(optim.Optimizer):
         self.Q_a, self.Q_g = {}, {}
         self.d_a, self.d_g = {}, {}
         self.Inv_a, self.Inv_g = {}, {}
-        self.stat_decay = 0 # stat_decay
 
         # two-level KFAC vars
         self.omega_1 = omega_1
@@ -63,12 +64,8 @@ class GKFACOptimizer(optim.Optimizer):
         self.nlayers = len(self.modules)
         self.a = [[] for l in range(self.nlayers)]
         self.g = [[] for l in range(self.nlayers)]
-        self.all_aa = [[[] for i in range(self.nlayers)] for j in range(self.nlayers)]
-        self.all_gg = [[[] for i in range(self.nlayers)] for j in range(self.nlayers)]
-
-        self.kl_clip = kl_clip
-        self.TCov = TCov
-        self.TInv = TInv
+        self.sum_aa = torch.zeros(self.nlayers, self.nlayers, device=device)
+        self.sum_gg = torch.zeros(self.nlayers, self.nlayers, device=device)
 
     @staticmethod
     def _downsample_multiply(a, i, j, batch_size, mode='nearest'):
@@ -93,45 +90,40 @@ class GKFACOptimizer(optim.Optimizer):
         if torch.is_grad_enabled() and self.steps % self.TCov == 0:
             # Get module index
             i = self.modules.index(module)
-            (aa, self.a[i]) = self.CovAHandler(input[0].data, module)
+            aa, self.a[i] = self.CovAHandler(input[0].data, module)
             # Initialize buffer
             if self.steps == 0:
-                self.m_aa[module] = torch.diag(aa.new(aa.size(0)).fill_(1))
+                self.m_aa[module] = torch.zeros_like(aa)
             update_running_stat(aa, self.m_aa[module], self.stat_decay)
-            # Update off-diagonal blocks of A
+            self.sum_aa[i][i] = self.m_aa[module].sum().item()
+            # Update sums of off-diagonal blocks of A
             for j in range(i):
                 # Compute inter-layer covariances (downsample if needed)
                 new_aa = self._downsample_multiply(self.a, i, j, input[0].shape[0], self.mode)
-                # Initialize buffer
-                if self.steps == 0:
-                    self.all_aa[i][j] = torch.zeros(self.a[i].shape[1], self.a[j].shape[1], device=new_aa.device)
-                update_running_stat(new_aa, self.all_aa[i][j], self.stat_decay)
-            # Update diagonal block of A
-            self.all_aa[i][i] = self.m_aa[module]
+                # Update sum
+                self.sum_aa[i][j] *= self.stat_decay
+                self.sum_aa[i][j] += (1 - self.stat_decay) * new_aa.sum().item()
 
     def _save_grad_output(self, module, grad_input, grad_output):
         # Accumulate statistics for Fisher matrices
         if self.acc_stats and self.steps % self.TCov == 0:
             # Get module index
             i = self.modules.index(module)
-            (gg, self.g[i]) = self.CovGHandler(grad_output[0].data, module, self.batch_averaged)
+            gg, self.g[i] = self.CovGHandler(grad_output[0].data, module, self.batch_averaged)
             # Initialize buffers
             if self.steps == 0:
-                self.m_gg[module] = torch.diag(gg.new(gg.size(0)).fill_(1))
+                self.m_gg[module] = torch.zeros_like(gg)
             update_running_stat(gg, self.m_gg[module], self.stat_decay)
-            # Update off-diagonal blocks of G
+            self.sum_gg[i][i] = self.m_gg[module].sum().item()
+            # Update sums of off-diagonal blocks of G
             for j in range(i, self.nlayers):
                 # Compute inter-layer covariances (downsample if needed)
                 new_gg = self._downsample_multiply(self.g, i, j, grad_output[0].shape[0], self.mode)
-                # Initialize buffer
-                if self.steps == 0:
-                    self.all_gg[i][j] = torch.zeros(self.g[i].shape[1], self.g[j].shape[1], device=new_gg.device)
-                # update_running_stat(new_gg, self.all_gg[i][j], self.stat_decay)
-                self.all_gg[i][j] = self.stat_decay * self.all_gg[i][j] + (1 - self.stat_decay) * new_gg
-            # Update diagonal block of A
-            self.all_gg[i][i] = self.m_gg[module]
+                # Update sum
+                self.sum_gg[i][j] *= self.stat_decay
+                self.sum_gg[i][j] += (1 - self.stat_decay) * new_gg.sum().item()
 
-    def _prepare_model(self):
+    def _register_modules(self):
         count = 0
         print(self.model)
         print("=> We keep following layers in GKFAC. ")
@@ -168,31 +160,18 @@ class GKFACOptimizer(optim.Optimizer):
             assert numer > 0, "trace(A) should be positive"
             assert denom > 0, "trace(G) should be positive"
             # assert pi > 0, "pi should be positive"
-            I_a = torch.eye(self.m_aa[m].shape[0], device=self.m_aa[m].device)
-            I_g = torch.eye(self.m_gg[m].shape[0], device=self.m_gg[m].device)
-            self.Inv_a[m] = torch.inverse(self.m_aa[m] + math.sqrt(damping * pi) * I_a)
-            self.Inv_g[m] = torch.inverse(self.m_gg[m] + math.sqrt(damping / pi) * I_g)
+            diag_a = self.m_aa[m].new(self.m_aa[m].shape[0]).fill_((damping * pi)**0.5)
+            diag_g = self.m_gg[m].new(self.m_gg[m].shape[0]).fill_((damping / pi)**0.5)
+            self.Inv_a[m] = ( self.m_aa[m] + torch.diag(diag_a) ).inverse()
+            self.Inv_g[m] = ( self.m_gg[m] + torch.diag(diag_g) ).inverse()
 
     def _update_coarse_fisher_inv(self):
         group = self.param_groups[0]
         damping = group['damping']
-        # Allocate coarse Fisher matrix
-        if self.steps == 0:
-            self.coarse_F = torch.zeros(self.nlayers, self.nlayers, device=self.all_aa[0][0].device)
-        # Compute lower triangular part of coarse Fisher matrix
-        for i in range(self.nlayers):
-            for j in range(i):
-                self.coarse_F[i][j] = sum_kron( self.all_aa[i][j], self.all_gg[j][i].t() )
-        # Fill upper triangular part of coarse Fisher matrix
-        self.coarse_F = self.coarse_F + self.coarse_F.t()
-        # Fill main diagonal of coarse Fisher matrix
-        for i in range(self.nlayers):
-            self.coarse_F[i][i] = sum_kron( self.all_aa[i][i], self.all_gg[i][i] ) + damping
-        # Compute coarse Fisher inverse
-        self.coarse_F_inverse = torch.inverse(self.coarse_F)
-        # self.coarse_L = torch.cholesky(self.coarse_F)
-        # self.coarse_F_inverse = torch.cholesky_inverse(self.coarse_L)
-
+        self.sum_aa += self.sum_aa.t() - self.sum_aa.diag().diag()
+        self.sum_gg += self.sum_gg.t() - self.sum_gg.diag().diag()
+        coarse_damping = self.sum_aa.new(self.sum_aa.shape[0]).fill_(damping)
+        self.coarse_F_inverse = ( self.sum_aa * self.sum_gg + torch.diag(coarse_damping)).inverse()
 
     @staticmethod
     def _get_matrix_form_grad(m, classname):
@@ -294,11 +273,11 @@ class GKFACOptimizer(optim.Optimizer):
             self._update_coarse_fisher_inv()
         # Compute fine part of natural gradient and assemble coarse rhs
         updates = {}
-        coarse_rhs = torch.zeros(self.nlayers, 1, device=self.coarse_F.device)
+        coarse_rhs = torch.zeros(self.nlayers, 1, device=self.coarse_F_inverse.device)
         for m in self.modules:
             classname = m.__class__.__name__
             p_grad_mat = self._get_matrix_form_grad(m, classname)
-            coarse_rhs[self.modules.index(m)] = torch.sum(p_grad_mat)
+            coarse_rhs[self.modules.index(m)] = p_grad_mat.sum().item()
             v = self._get_natural_grad(m, p_grad_mat, damping)
             updates[m] = v
         # Compute coarse part of natural gradient

@@ -41,7 +41,7 @@ class EKFACOptimizer(optim.Optimizer):
         self.grad_outputs = {}
 
         self.model = model
-        self._prepare_model()
+        self._register_modules()
 
         self.steps = 0
 
@@ -83,7 +83,7 @@ class EKFACOptimizer(optim.Optimizer):
             self.DS[module] = grad_output[0].data
             # self._update_scale(module)
 
-    def _prepare_model(self):
+    def _register_modules(self):
         count = 0
         print(self.model)
         print("=> We keep following layers in EKFAC. ")

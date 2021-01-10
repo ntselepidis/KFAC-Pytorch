@@ -30,37 +30,35 @@ class KFACOptimizer(optim.Optimizer):
                         weight_decay=weight_decay)
         # TODO (CW): KFAC optimizer now only support model as input
         super(KFACOptimizer, self).__init__(model.parameters(), defaults)
+
+        self.model = model
+        self.known_modules = {'Linear', 'Conv2d'}
+        self.modules = []
+        self._register_modules()
+
+        # utility vars
         self.CovAHandler = ComputeCovA()
         self.CovGHandler = ComputeCovG()
         self.batch_averaged = batch_averaged
-
-        self.known_modules = {'Linear', 'Conv2d'}
-
-        self.modules = []
-        self.grad_outputs = {}
-
-        self.model = model
-        self._prepare_model()
-
+        self.stat_decay = 0 # stat_decay
+        self.kl_clip = kl_clip
+        self.TCov = TCov
+        self.TInv = TInv
         self.steps = 0
 
+        # one-level KFAC vars
         self.solver = solver
         self.m_aa, self.m_gg = {}, {}
         self.Q_a, self.Q_g = {}, {}
         self.d_a, self.d_g = {}, {}
         self.Inv_a, self.Inv_g = {}, {}
-        self.stat_decay = 0 # stat_decay
-
-        self.kl_clip = kl_clip
-        self.TCov = TCov
-        self.TInv = TInv
 
     def _save_input(self, module, input):
         if torch.is_grad_enabled() and self.steps % self.TCov == 0:
             aa, _ = self.CovAHandler(input[0].data, module)
             # Initialize buffers
             if self.steps == 0:
-                self.m_aa[module] = torch.diag(aa.new(aa.size(0)).fill_(1))
+                self.m_aa[module] = torch.zeros_like(aa)
             update_running_stat(aa, self.m_aa[module], self.stat_decay)
 
     def _save_grad_output(self, module, grad_input, grad_output):
@@ -69,10 +67,10 @@ class KFACOptimizer(optim.Optimizer):
             gg, _ = self.CovGHandler(grad_output[0].data, module, self.batch_averaged)
             # Initialize buffers
             if self.steps == 0:
-                self.m_gg[module] = torch.diag(gg.new(gg.size(0)).fill_(1))
+                self.m_gg[module] = torch.zeros_like(gg)
             update_running_stat(gg, self.m_gg[module], self.stat_decay)
 
-    def _prepare_model(self):
+    def _register_modules(self):
         count = 0
         print(self.model)
         print("=> We keep following layers in KFAC. ")
@@ -109,10 +107,10 @@ class KFACOptimizer(optim.Optimizer):
             assert numer > 0, "trace(A) should be positive"
             assert denom > 0, "trace(G) should be positive"
             # assert pi > 0, "pi should be positive"
-            I_a = torch.eye(self.m_aa[m].shape[0], device=self.m_aa[m].device)
-            I_g = torch.eye(self.m_gg[m].shape[0], device=self.m_gg[m].device)
-            self.Inv_a[m] = torch.inverse(self.m_aa[m] + math.sqrt(damping * pi) * I_a)
-            self.Inv_g[m] = torch.inverse(self.m_gg[m] + math.sqrt(damping / pi) * I_g)
+            diag_a = self.m_aa[m].new(self.m_aa[m].shape[0]).fill_((damping * pi)**0.5)
+            diag_g = self.m_gg[m].new(self.m_gg[m].shape[0]).fill_((damping / pi)**0.5)
+            self.Inv_a[m] = ( self.m_aa[m] + torch.diag(diag_a) ).inverse()
+            self.Inv_g[m] = ( self.m_gg[m] + torch.diag(diag_g) ).inverse()
 
     @staticmethod
     def _get_matrix_form_grad(m, classname):
@@ -163,6 +161,8 @@ class KFACOptimizer(optim.Optimizer):
             vg_sum += (v[0] * m.weight.grad.data * lr ** 2).sum().item()
             if m.bias is not None:
                 vg_sum += (v[1] * m.bias.grad.data * lr ** 2).sum().item()
+        assert vg_sum != 0, "vg_sum should be non-zero"
+        assert vg_sum > 0, "vg_sum should be positive"
         nu = min(1.0, math.sqrt(self.kl_clip / vg_sum))
 
         for m in self.modules:
