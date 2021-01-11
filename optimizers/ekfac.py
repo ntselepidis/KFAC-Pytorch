@@ -7,7 +7,7 @@ from utils.kfac_utils import update_running_stat
 from utils.kfac_utils import get_matrix_form_grad
 
 
-class EKFACOptimizer(torch.optim.Optimizer):
+class EKFAC(torch.optim.Optimizer):
     def __init__(self,
                  model,
                  lr=0.001,
@@ -29,7 +29,7 @@ class EKFACOptimizer(torch.optim.Optimizer):
         defaults = dict(lr=lr, momentum=momentum, damping=damping,
                         weight_decay=weight_decay)
         # TODO (CW): EKFAC optimizer now only support model as input
-        super(EKFACOptimizer, self).__init__(model.parameters(), defaults)
+        super(EKFAC, self).__init__(model.parameters(), defaults)
         self.CovAHandler = ComputeCovA()
         self.CovGHandler = ComputeCovG()
         self.MatGradHandler = ComputeMatGrad()

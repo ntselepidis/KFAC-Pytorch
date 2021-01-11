@@ -7,7 +7,7 @@ from utils.kfac_utils import update_running_stat
 from utils.kfac_utils import get_matrix_form_grad
 
 
-class GKFACOptimizer(torch.optim.Optimizer):
+class GKFAC(torch.optim.Optimizer):
     def __init__(self,
                  model,
                  lr=0.001,
@@ -35,7 +35,7 @@ class GKFACOptimizer(torch.optim.Optimizer):
                         weight_decay=weight_decay)
 
         # TODO (CW): GKFAC optimizer now only support model as input
-        super(GKFACOptimizer, self).__init__(model.parameters(), defaults)
+        super(GKFAC, self).__init__(model.parameters(), defaults)
 
         self.model = model
         self.known_modules = {'Linear', 'Conv2d'}
