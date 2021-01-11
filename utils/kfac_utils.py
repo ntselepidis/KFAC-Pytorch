@@ -2,6 +2,20 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+def get_matrix_form_grad(m):
+    """
+    :param m: the layer
+    :return: a matrix form of the gradient. it should be a [output_dim, input_dim] matrix.
+    """
+    classname = m.__class__.__name__
+    if classname == 'Conv2d':
+        p_grad_mat = m.weight.grad.view(m.weight.grad.size(0), -1)  # n_filters * (in_c * kw * kh)
+    else:
+        p_grad_mat = m.weight.grad
+    if m.bias is not None:
+        p_grad_mat = torch.cat([p_grad_mat, m.bias.grad.view(-1, 1)], 1)
+    return p_grad_mat
+
 
 def try_contiguous(x):
     if not x.is_contiguous():

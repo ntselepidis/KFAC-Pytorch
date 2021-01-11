@@ -1,13 +1,13 @@
 import math
 
 import torch
-import torch.optim as optim
 
 from utils.kfac_utils import (ComputeCovA, ComputeCovG, ComputeMatGrad)
 from utils.kfac_utils import update_running_stat
+from utils.kfac_utils import get_matrix_form_grad
 
 
-class EKFACOptimizer(optim.Optimizer):
+class EKFACOptimizer(torch.optim.Optimizer):
     def __init__(self,
                  model,
                  lr=0.001,
@@ -112,21 +112,6 @@ class EKFACOptimizer(optim.Optimizer):
         # if self.steps != 0:
         self.S_l[m] = self.d_g[m].unsqueeze(1) @ self.d_a[m].unsqueeze(0)
 
-    @staticmethod
-    def _get_matrix_form_grad(m, classname):
-        """
-        :param m: the layer
-        :param classname: the class name of the layer
-        :return: a matrix form of the gradient. it should be a [output_dim, input_dim] matrix.
-        """
-        if classname == 'Conv2d':
-            p_grad_mat = m.weight.grad.data.view(m.weight.grad.data.size(0), -1)  # n_filters * (in_c * kw * kh)
-        else:
-            p_grad_mat = m.weight.grad.data
-        if m.bias is not None:
-            p_grad_mat = torch.cat([p_grad_mat, m.bias.grad.data.view(-1, 1)], 1)
-        return p_grad_mat
-
     def _get_natural_grad(self, m, p_grad_mat, damping):
         """
         :param m:  the layer
@@ -149,7 +134,7 @@ class EKFACOptimizer(optim.Optimizer):
 
         return v
 
-    def _kl_clip_and_update_grad(self, updates, lr):
+    def _scale_natural_grad(self, updates, lr):
         # do kl clip
         vg_sum = 0
         for m in self.modules:
@@ -225,17 +210,16 @@ class EKFACOptimizer(optim.Optimizer):
         damping = group['damping']
         updates = {}
         for m in self.modules:
-            classname = m.__class__.__name__
             if self.steps % self.TInv == 0:
                 self._update_inv(m)
 
             if self.steps % self.TScal == 0 and self.steps > 0:
                 self._update_scale(m)
 
-            p_grad_mat = self._get_matrix_form_grad(m, classname)
+            p_grad_mat = get_matrix_form_grad(m)
             v = self._get_natural_grad(m, p_grad_mat, damping)
             updates[m] = v
-        self._kl_clip_and_update_grad(updates, lr)
+        self._scale_natural_grad(updates, lr)
 
         self._step(closure)
         self.steps += 1
