@@ -262,16 +262,16 @@ class GKFAC(torch.optim.Optimizer):
         # Compute fine part of natural gradient and assemble coarse rhs
         updates = {}
         coarse_rhs = torch.zeros(self.nlayers, 1, device=self.coarse_F_inverse.device)
-        for m in self.modules:
+        for m_index, m in enumerate(self.modules):
             p_grad_mat = get_matrix_form_grad(m)
-            coarse_rhs[self.modules.index(m)] = p_grad_mat.sum().item()
+            coarse_rhs[m_index] = p_grad_mat.sum().item()
             v = self._get_natural_grad(m, p_grad_mat, damping)
             updates[m] = v
         # Compute coarse part of natural gradient
         coarse_v = self.coarse_F_inverse @ coarse_rhs
         # Add fine and coarse parts of natural gradient
-        for m in self.modules:
-            coarse_v_m = coarse_v[self.modules.index(m)]
+        for m_index, m in enumerate(self.modules):
+            coarse_v_m = coarse_v[m_index]
             updates[m][0] = self.omega_1 * updates[m][0] + self.omega_2 * coarse_v_m
             if m.bias is not None:
                 updates[m][1] = self.omega_1 * updates[m][1] + self.omega_2 * coarse_v_m

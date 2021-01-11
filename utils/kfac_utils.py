@@ -20,7 +20,6 @@ def get_matrix_form_grad(m):
 def try_contiguous(x):
     if not x.is_contiguous():
         x = x.contiguous()
-
     return x
 
 
@@ -205,9 +204,4 @@ if __name__ == '__main__':
 
     def test_ComputeCovG():
         pass
-
-
-
-
-
 
