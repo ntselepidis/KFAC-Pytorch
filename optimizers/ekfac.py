@@ -134,7 +134,7 @@ class EKFAC(torch.optim.Optimizer):
 
         return v
 
-    def _scale_natural_grad(self, updates, lr):
+    def _kl_clip_and_update_grad(self, updates, lr):
         # do kl clip
         vg_sum = 0
         for m in self.modules:
@@ -219,7 +219,7 @@ class EKFAC(torch.optim.Optimizer):
             p_grad_mat = get_matrix_form_grad(m)
             v = self._get_natural_grad(m, p_grad_mat, damping)
             updates[m] = v
-        self._scale_natural_grad(updates, lr)
+        self._kl_clip_and_update_grad(updates, lr)
 
         self._step(closure)
         self.steps += 1

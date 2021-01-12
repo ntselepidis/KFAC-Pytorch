@@ -202,7 +202,7 @@ class GKFAC(torch.optim.Optimizer):
 
         return v
 
-    def _scale_natural_grad(self, updates, lr):
+    def _kl_clip_and_update_grad(self, updates, lr):
         # do kl clip
         vg_sum = 0
         for m in self.modules:
@@ -276,7 +276,7 @@ class GKFAC(torch.optim.Optimizer):
             if m.bias is not None:
                 updates[m][1] = self.omega_1 * updates[m][1] + self.omega_2 * coarse_v_m
 
-        self._scale_natural_grad(updates, lr)
+        self._kl_clip_and_update_grad(updates, lr)
 
         self._step(closure)
         self.steps += 1
