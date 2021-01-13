@@ -139,9 +139,9 @@ class EKFAC(torch.optim.Optimizer):
         vg_sum = 0
         for m in self.modules:
             v = updates[m]
-            vg_sum += (v[0] * m.weight.grad.data * lr ** 2).sum().item()
+            vg_sum += (v[0] * m.weight.grad.data * lr ** 2).sum()
             if m.bias is not None:
-                vg_sum += (v[1] * m.bias.grad.data * lr ** 2).sum().item()
+                vg_sum += (v[1] * m.bias.grad.data * lr ** 2).sum()
         nu = min(1.0, math.sqrt(self.kl_clip / vg_sum))
 
         for m in self.modules:

@@ -42,10 +42,10 @@ def train(epoch):
         loss.backward()
         optimizer.step()
 
-        train_loss += loss.item()
+        train_loss += loss
         _, predicted = outputs.max(1)
         total += targets.size(0)
-        correct += predicted.eq(targets).sum().item()
+        correct += predicted.eq(targets).sum()
 
         desc = ('[%s][LR=%s] Loss: %.3f | Acc: %.3f%% (%d/%d)' %
                 (tag, optimizer.param_groups[0]['lr'], train_loss / (batch_idx + 1), 100. * correct / total, correct, total))
@@ -71,10 +71,10 @@ def test(epoch):
             outputs = net(inputs)
             loss = criterion(outputs, targets)
 
-            test_loss += loss.item()
+            test_loss += loss
             _, predicted = outputs.max(1)
             total += targets.size(0)
-            correct += predicted.eq(targets).sum().item()
+            correct += predicted.eq(targets).sum()
 
             desc = ('[%s][LR=%s] Loss: %.3f | Acc: %.3f%% (%d/%d)'
                     % (tag, optimizer.param_groups[0]['lr'], test_loss / (batch_idx + 1), 100. * correct / total, correct, total))

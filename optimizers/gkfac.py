@@ -98,14 +98,14 @@ class GKFAC(torch.optim.Optimizer):
             if self.steps == 0:
                 self.m_aa[module] = torch.zeros_like(aa)
             update_running_stat(aa, self.m_aa[module], self.stat_decay)
-            self.sum_aa[i][i] = self.m_aa[module].sum().item()
+            self.sum_aa[i][i] = self.m_aa[module].sum()
             # Update sums of off-diagonal blocks of A
             for j in range(i):
                 # Compute inter-layer covariances (downsample if needed)
                 new_aa = self._downsample_multiply(self.a, i, j, input[0].shape[0], self.mode)
                 # Update sum
                 self.sum_aa[i][j] *= self.stat_decay
-                self.sum_aa[i][j] += (1 - self.stat_decay) * new_aa.sum().item()
+                self.sum_aa[i][j] += (1 - self.stat_decay) * new_aa.sum()
 
     def _save_grad_output(self, module, grad_input, grad_output):
         # Accumulate statistics for Fisher matrices
@@ -117,14 +117,14 @@ class GKFAC(torch.optim.Optimizer):
             if self.steps == 0:
                 self.m_gg[module] = torch.zeros_like(gg)
             update_running_stat(gg, self.m_gg[module], self.stat_decay)
-            self.sum_gg[i][i] = self.m_gg[module].sum().item()
+            self.sum_gg[i][i] = self.m_gg[module].sum()
             # Update sums of off-diagonal blocks of G
             for j in range(i, self.nlayers):
                 # Compute inter-layer covariances (downsample if needed)
                 new_gg = self._downsample_multiply(self.g, i, j, grad_output[0].shape[0], self.mode)
                 # Update sum
                 self.sum_gg[i][j] *= self.stat_decay
-                self.sum_gg[i][j] += (1 - self.stat_decay) * new_gg.sum().item()
+                self.sum_gg[i][j] += (1 - self.stat_decay) * new_gg.sum()
 
     def _register_modules(self):
         count = 0
@@ -157,14 +157,14 @@ class GKFAC(torch.optim.Optimizer):
         else:
             group = self.param_groups[0]
             damping = group['damping']
-            numer = self.m_aa[m].trace().item() * self.m_gg[m].shape[0]
-            denom = self.m_gg[m].trace().item() * self.m_aa[m].shape[0]
+            numer = self.m_aa[m].trace() * self.m_gg[m].shape[0]
+            denom = self.m_gg[m].trace() * self.m_aa[m].shape[0]
             pi = numer / denom
             assert numer > 0, "trace(A) should be positive"
             assert denom > 0, "trace(G) should be positive"
             # assert pi > 0, "pi should be positive"
-            diag_a = self.m_aa[m].new(self.m_aa[m].shape[0]).fill_((damping * pi)**0.5)
-            diag_g = self.m_gg[m].new(self.m_gg[m].shape[0]).fill_((damping / pi)**0.5)
+            diag_a = self.m_aa[m].new_full((self.m_aa[m].shape[0],), (damping * pi)**0.5)
+            diag_g = self.m_gg[m].new_full((self.m_gg[m].shape[0],), (damping / pi)**0.5)
             self.Inv_a[m] = ( self.m_aa[m] + torch.diag(diag_a) ).inverse()
             self.Inv_g[m] = ( self.m_gg[m] + torch.diag(diag_g) ).inverse()
 
@@ -207,12 +207,12 @@ class GKFAC(torch.optim.Optimizer):
         vg_sum = 0
         for m in self.modules:
             v = updates[m]
-            vg_sum += (v[0] * m.weight.grad * lr ** 2).sum().item()
+            vg_sum += (v[0] * m.weight.grad * lr ** 2).sum()
             if m.bias is not None:
-                vg_sum += (v[1] * m.bias.grad * lr ** 2).sum().item()
+                vg_sum += (v[1] * m.bias.grad * lr ** 2).sum()
         assert vg_sum != 0, "vg_sum should be non-zero"
         assert vg_sum > 0, "vg_sum should be positive"
-        nu = min(1.0, math.sqrt(self.kl_clip / vg_sum))
+        nu = min(1.0, (self.kl_clip / vg_sum)**0.5)
         # update grad
         for m in self.modules:
             v = updates[m]
@@ -264,7 +264,7 @@ class GKFAC(torch.optim.Optimizer):
         coarse_rhs = torch.zeros(self.nlayers, 1, device=self.coarse_F_inverse.device)
         for m_index, m in enumerate(self.modules):
             p_grad_mat = get_matrix_form_grad(m)
-            coarse_rhs[m_index] = p_grad_mat.sum().item()
+            coarse_rhs[m_index] = p_grad_mat.sum()
             v = self._get_natural_grad(m, p_grad_mat, damping)
             updates[m] = v
         # Compute coarse part of natural gradient

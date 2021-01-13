@@ -58,7 +58,7 @@ def train(epoch):
         loss.backward()
         optimizer.step()
 
-        train_loss += loss.item()
+        train_loss += loss
         desc = ('[%s][LR=%s] Loss: %.3f' %
                 (tag, optimizer.param_groups[0]['lr'], train_loss / (batch_idx + 1)))
         prog_bar.set_description(desc, refresh=True)
@@ -78,7 +78,7 @@ def test(epoch):
             outputs = net(inputs)
             loss = criterion(outputs, inputs)
 
-            test_loss += loss.item()
+            test_loss += loss
             desc = ('[%s][LR=%s] Loss: %.3f'
                     % (tag, optimizer.param_groups[0]['lr'], test_loss / (batch_idx + 1)))
             prog_bar.set_description(desc, refresh=True)
@@ -100,6 +100,7 @@ def test(epoch):
 args = get_args()
 args.network = 'deep_autoencoder'
 args.dataset = 'mnist'
+args.activation = 'tanh'
 
 # set random seed for reproducibility
 torch.manual_seed(args.seed)
@@ -145,7 +146,8 @@ if not os.path.isdir(log_dir):
 writer = SummaryWriter(log_dir)
 
 # create output directory for visualized results
-visualization_dir = f"visuals/mnist/{optim_name}"
+#visualization_dir = f"visuals/mnist/{optim_name}"
+visualization_dir = log_dir + f"/mnist/{optim_name}"
 if not os.path.isdir(visualization_dir):
     os.makedirs(visualization_dir)
 

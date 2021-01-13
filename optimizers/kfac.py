@@ -104,14 +104,14 @@ class KFAC(torch.optim.Optimizer):
         else:
             group = self.param_groups[0]
             damping = group['damping']
-            numer = self.m_aa[m].trace().item() * self.m_gg[m].shape[0]
-            denom = self.m_gg[m].trace().item() * self.m_aa[m].shape[0]
+            numer = self.m_aa[m].trace() * self.m_gg[m].shape[0]
+            denom = self.m_gg[m].trace() * self.m_aa[m].shape[0]
             pi = numer / denom
             assert numer > 0, "trace(A) should be positive"
             assert denom > 0, "trace(G) should be positive"
             # assert pi > 0, "pi should be positive"
-            diag_a = self.m_aa[m].new(self.m_aa[m].shape[0]).fill_((damping * pi)**0.5)
-            diag_g = self.m_gg[m].new(self.m_gg[m].shape[0]).fill_((damping / pi)**0.5)
+            diag_a = self.m_aa[m].new_full((self.m_aa[m].shape[0],), (damping * pi)**0.5)
+            diag_g = self.m_gg[m].new_full((self.m_gg[m].shape[0],), (damping / pi)**0.5)
             self.Inv_a[m] = ( self.m_aa[m] + torch.diag(diag_a) ).inverse()
             self.Inv_g[m] = ( self.m_gg[m] + torch.diag(diag_g) ).inverse()
 
@@ -146,12 +146,12 @@ class KFAC(torch.optim.Optimizer):
         vg_sum = 0
         for m in self.modules:
             v = updates[m]
-            vg_sum += (v[0] * m.weight.grad * lr ** 2).sum().item()
+            vg_sum += (v[0] * m.weight.grad * lr ** 2).sum()
             if m.bias is not None:
-                vg_sum += (v[1] * m.bias.grad * lr ** 2).sum().item()
+                vg_sum += (v[1] * m.bias.grad * lr ** 2).sum()
         assert vg_sum != 0, "vg_sum should be non-zero"
         assert vg_sum > 0, "vg_sum should be positive"
-        nu = min(1.0, math.sqrt(self.kl_clip / vg_sum))
+        nu = min(1.0, (self.kl_clip / vg_sum)**0.5)
         # update grad
         for m in self.modules:
             v = updates[m]
